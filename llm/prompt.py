@@ -12,6 +12,9 @@ Rules:
 - Do NOT use any external information or prior knowledge.
 - If the answer is not contained in the context, say:
     "I don't know based on the provided context."
+- Provide a concise answer
+- Do NOT repeat sentence and the answer.
+- Do NOT speculates
 - Cite sources using [number].
 -Cite at least one source in each answer.
 - If multiple sources support the same answer, cite all relevant sources.

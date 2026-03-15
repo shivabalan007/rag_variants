@@ -1,0 +1,107 @@
+
+
+1.What is Object-Oriented Programming (OOP)? 
+Object-Oriented Programming (OOP) is a programming paradigm that organizes 
+code around objects, which are instances of classes. It emphasizes the concepts of 
+encapsulation, inheritance, and polymorphism.
+2. What is a class in OOP? 
+In OOP, a class is a blueprint or template that defines the properties (attributes) and 
+behaviors (methods) that objects of that class will have. It serves as a blueprint for 
+creating objects.
+3. What is an object in OOP? 
+An object is an instance of a class. It represents a real-world entity and encapsulates 
+both data (attributes) and behavior (methods).
+4. What is encapsulation in OOP? 
+Encapsulation is the process of bundling data and methods together within a class, 
+hiding the internal details of how an object works. It provides data abstraction and 
+protects the data from external access.
+5. What is inheritance in OOP? 
+Inheritance is a mechanism in OOP that allows a class (subclass) to inherit the 
+properties and methods of another class (superclass). It promotes code reusability 
+and supports the "is-a" relationship between classes.
+6. What is polymorphism in OOP? 
+Polymorphism allows objects of different classes to be treated as objects of a 
+common superclass. It enables the same method to be used with objects of different 
+classes, providing flexibility and extensibility.
+7. What are the four pillars of OOP? 
+The four pillars of OOP are:
+a. Encapsulation: Bundling data and methods within a class.
+b. Inheritance: Inheriting properties and methods from a superclass.
+c. Polymorphism: Treating objects of different classes as objects of a common 
+superclass.
+d. Abstraction: Simplifying complex systems by modeling relevant objects.
+8. What is abstraction in OOP? 
+Abstraction is the process of simplifying complex systems by modeling relevant 
+objects and ignoring unnecessary details. It focuses on the essential features and 
+behavior of an object.
+9. What is a constructor in OOP? 
+A constructor is a special method in a class that is called when an object of that 
+class is created. It is used to initialize the object's state and perform any necessary 
+setup.
+10. What is method overriding in OOP? 
+Method overriding is the ability of a subclass to provide a different implementation of 
+a method that is already defined in its superclass. It allows the subclass to modify 
+the behavior of the inherited method.
+11. What is method overloading in OOP? 
+Method overloading is the ability to define multiple methods with the same name but 
+different parameters in a class. It provides flexibility in invoking methods with 
+different argument combinations.
+12. What is the difference between method overriding and method overloading? 
+Method overriding involves providing a different implementation of a method in a 
+subclass, whereas method overloading involves defining multiple methods with the 
+same name but different parameters within a class.
+13. What is a static method in OOP? 
+A static method is a method that belongs to the class itself rather than an instance of
+the class. It can be called directly on the class without creating an object.
+14. What is a static variable in OOP? 
+A static variable is a variable that is shared among all instances of a class. It is 
+associated with the class rather than specific instances, and its value remains the 
+same across different objects.
+15. What is an instance variable in OOP? 
+An instance variable is a variable that is unique to each instance (object) of a class. 
+Each object has its own copy of instance variables, and their values can vary from 
+object to object.
+16. What is a constructor overloading? 
+Constructor overloading is the ability to define multiple constructors within a class 
+with different parameter combinations. It allows objects to be created with different 
+initialization options.
+17. What is an abstract class in OOP? 
+An abstract class is a class that cannot be instantiated and serves as a base for 
+deriving subclasses. It may contain abstract methods (without implementation) and 
+can define common behavior for its subclasses.
+18. What is an interface in OOP? 
+An interface is a collection of abstract methods that define a contract for classes 
+that implement it. It specifies the methods that a class must implement but does not 
+provide any implementation itself.
+19. What is multiple inheritance in OOP? 
+Multiple inheritance is the ability of a class to inherit properties and methods from 
+multiple parent classes. However, most programming languages do not support 
+multiple inheritance to avoid ambiguity and complexity.
+20. What is a package in OOP? 
+A package is a mechanism for organizing related classes and interfaces into a single 
+namespace. It helps avoid naming conflicts and provides a modular structure to 
+manage code effectively.
+21. What is a namespace in OOP? 
+A namespace is a container that holds a set of related classes, interfaces, and other 
+objects. It provides a way to group and organize code elements and avoids naming 
+conflicts.
+22. What is the difference between a class and an object in OOP? 
+A class is a blueprint or template that defines the properties and behaviors of 
+objects, whereas an object is an instance of a class. A class represents the general 
+characteristics, while an object represents a specific instance.
+23. What is the difference between a superclass and a subclass in OOP? 
+A superclass is a class from which other classes (subclasses) inherit properties and 
+methods. It is more general and provides common behavior. A subclass is a class 
+that inherits from a superclass and can extend or modify its behavior.
+24. What is the difference between composition and inheritance? 
+Composition is a design technique where a class is composed of objects of other 
+classes as members. It emphasizes "has-a" relationships. Inheritance is a 
+mechanism where a class inherits properties and methods from another class, 
+emphasizing "is-a" relationships.
+25. What is the SOLID principle in OOP? 
+SOLID is an acronym for a set of design principles:
+a. Single Responsibility Principle (SRP)
+b. Open/Closed Principle (OCP)
+c. Liskov Substitution Principle (LSP)
+d. Interface Segregation Principle (ISP)
+e. Dependency Inversion Principle (DIP)

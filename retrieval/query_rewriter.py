@@ -1,6 +1,4 @@
-from llm.gemini_client import GeminiLLM
-
-llm = GeminiLLM()
+from llm.openrouter_client import llm
 
 def rewrite_query(query):
     prompt = f"""

@@ -1,5 +1,6 @@
 from orchestration.agent_state import AgentState
 from retrieval.query_rewriter import rewrite_query
+from retrieval.hybrid_retriever import HybridRetriever
 from retrieval.reranker import CrossEncoderReranker
 from llm.generator import generate_answer
 
@@ -22,7 +23,8 @@ class RAGPipeline:
 
         self.threshold = similarity_threshold
         self.max_attempts = max_attempts
-
+        
+        self.hybrid_retriever = HybridRetriever(chunks)
         self.reranker = CrossEncoderReranker()
         self.decision_engine = DecisionEngine()
 
@@ -34,19 +36,12 @@ class RAGPipeline:
     # Stage 2: Retrieve + threshold filtering
     def retrieve(self, state: AgentState, top_k):
 
-        query_vector = self.embedder.embed_query(state.rewritten_query)
-
-        scores, indices = self.store.search(query_vector, top_k)
-
-        state.similarity_scores = scores[0]
-
-        filtered = []
-
-        for score, idx in zip(scores[0], indices[0]):
-            if score >= self.threshold:
-                filtered.append(self.chunks[idx])
-
-        state.candidate_chunks = filtered
+        state.candidate_chunks = self.hybrid_retriever.hybrid_search(
+            state.rewritten_query,
+            self.store,
+            self.embedder,
+            top_k=10
+        )
 
         return state
 
@@ -119,7 +114,7 @@ class RAGPipeline:
 
             state = self.rewrite(state)
 
-            state = self.retrieve(state, top_k=3 + attempt * 2)
+            state = self.retrieve(state, top_k=10)
 
             state = self.rerank(state)
 
@@ -129,7 +124,8 @@ class RAGPipeline:
 
             decision = self.decision_engine.decide(
                 state.overlap,
-                state.faithfulness
+                state.faithfulness,
+                state.relevance
             )
 
             state.decision = decision

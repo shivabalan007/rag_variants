@@ -1,34 +1,44 @@
 from rank_bm25 import BM25Okapi
-import numpy as np
+
 
 class HybridRetriever:
+
     def __init__(self, chunks):
         self.chunks = chunks
+
         tokenized = [chunk.text.split() for chunk in chunks]
         self.bm25 = BM25Okapi(tokenized)
 
-    def hybrid_search(self, query, vector_store, embedder, tok_k=5):
-        #Vector search
-        query_vector = embedder.embed_query(query)
-        v_scores, v_indices = vector_store.search(query_vector, top_k=tok_k)
+    def hybrid_search(self, query, vector_store, embedder, top_k=10):
 
-        #BM25 search
+        # -------- Vector Search --------
+        query_vector = embedder.embed_query(query)
+
+        v_scores, v_indices = vector_store.search(query_vector, top_k)
+
+        vector_chunks = [self.chunks[i] for i in v_indices[0]]
+
+        # -------- BM25 Search --------
         tokenized_query = query.split()
+
         bm25_scores = self.bm25.get_scores(tokenized_query)
 
-        #Combine scores
+        bm25_indices = sorted(
+            range(len(bm25_scores)),
+            key=lambda i: bm25_scores[i],
+            reverse=True
+        )[:top_k]
+
+        bm25_chunks = [self.chunks[i] for i in bm25_indices]
+
+        # -------- Combine results --------
         combined = []
 
-        for idx in range(len(self.chunks)):
-            vector_score = 0
-            import faiss
-            if i in v_indices[0]:
-                idx_pos = list(v_indices[0]).index(i)
-                vector_score = v_scores[0][idx_pos]
+        for v, b in zip(vector_chunks, bm25_chunks):
+            combined.append(v)
+            combined.append(b)
 
-            score = vector_score + 0.3 * bm25_scores[i]
-            combined.append((self.chunks[i], score))
+        # remove duplicates
+        unique_chunks = list({chunk.text: chunk for chunk in combined}.values())
 
-        combined.sort(key=lambda x: x[1], reverse=True)
-
-        return [chunk for chunk, _ in combined[:top_k]]
+        return unique_chunks[:15]

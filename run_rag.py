@@ -1,6 +1,8 @@
 from ingestion.run_ingestion import ingest
+from ingestion.base import Document
 from chunking.base import ChunkConfig
-from chunking.fixed_chunker import fixed_chunk_document
+from chunking.semantic_window_chunker import semantic_chunk
+from chunking.sliding_window_chunker import sliding_window_chunk
 
 from embeddings.base import EmbeddingConfig
 from embeddings.embedder import Embedder
@@ -22,17 +24,16 @@ def main():
 
 
     # CHUNK DOCUMENTS
-    chunk_config = ChunkConfig(
-        chunk_size=300,
-        overlap=50
-    )
-
     chunks = []
 
     for doc in docs:
-        chunks.extend(
-            fixed_chunk_document(doc, chunk_config)
-        )
+        semantic_chunks = semantic_chunk(doc.text)
+
+        for sc in semantic_chunks:
+            window_chunks = sliding_window_chunk(sc, chunk_size=300, overlap=50)
+            
+        for chunk in window_chunks:
+            chunks.append(Document(text=chunk, metadata=doc.metadata))
 
     print(f"Total chunks created: {len(chunks)}")
 
