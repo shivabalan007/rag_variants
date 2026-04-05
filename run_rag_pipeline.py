@@ -3,7 +3,7 @@ from orchestration.rag_pipeline import RAGPipeline
 from ingestion.run_ingestion import ingest
 from ingestion.base import Document
 from chunking.base import ChunkConfig
-from chunking.semantic_window_chunker import semantic_chunk
+from chunking.semantic_chunker import semantic_chunk
 from chunking.sliding_window_chunker import sliding_window_chunk
 
 
@@ -16,7 +16,7 @@ from retrieval.vector_store import VectorStore
 def main():
 
     # 1️⃣ Ingest
-    docs = ingest("data/test1.txt")
+    docs = ingest("data/test2.txt")
 
     # 2️⃣ Chunk
     chunks = []
@@ -26,9 +26,8 @@ def main():
 
         for sc in semantic_chunks:
             window_chunks = sliding_window_chunk(sc, chunk_size=300, overlap=50)
-
-        for chunk in window_chunks:
-            chunks.append(Document(text=chunk, metadata=doc.metadata))
+            for chunk in window_chunks:                                          # FIX: nested inside semantic loop
+                chunks.append(Document(text=chunk, metadata=doc.metadata))
 
     # 3️⃣ Embed
     embedder = Embedder(

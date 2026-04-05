@@ -3,46 +3,43 @@ import pickle
 import faiss
 
 from ingestion.run_ingestion import ingest
-from chunking.base import ChunkConfig
-from chunking.fixed_chunker import fixed_chunk_document
+from ingestion.base import Document
+from chunking.semantic_chunker import semantic_chunk
+from chunking.sliding_window_chunker import sliding_window_chunk
 from embeddings.base import EmbeddingConfig
 from embeddings.embedder import Embedder
 
 print("Building FAISS index...")
 
-# Load documents
-docs = ingest("data/test1.txt")
+# 1️⃣ Ingest
+docs = ingest("data/test2.txt")
 
-chunk_config = ChunkConfig(chunk_size=300, overlap=50)
-
+# 2️⃣ Chunk — semantic + sliding window (matches RAG pipeline)
 chunks = []
 for doc in docs:
-    chunks.extend(fixed_chunk_document(doc, chunk_config))
+    semantic_chunks = semantic_chunk(doc.text)
+    for sc in semantic_chunks:
+        window_chunks = sliding_window_chunk(sc, chunk_size=300, overlap=50)
+        for chunk in window_chunks:                         # FIX: nested correctly
+            chunks.append(Document(text=chunk, metadata=doc.metadata))
 
-print("Total chunks:", len(chunks))
+print(f"Total chunks: {len(chunks)}")
 
-# Embed
-embedder = Embedder(
-    EmbeddingConfig(model_name="all-MiniLM-L6-v2")
-)
-
+# 3️⃣ Embed
+embedder = Embedder(EmbeddingConfig(model_name="all-MiniLM-L6-v2"))
 embeddings = embedder.embed_documents(chunks)
 
-# Create index
+# 4️⃣ Build FAISS index
 dim = embeddings.shape[1]
-
 index = faiss.IndexFlatL2(dim)
-
 index.add(embeddings)
 
-# Ensure artifacts folder exists
+# 5️⃣ Save artifacts
 os.makedirs("artifacts", exist_ok=True)
 
-# Save index
 faiss.write_index(index, "artifacts/faiss.index")
 
-# Save chunks
 with open("artifacts/chunks.pkl", "wb") as f:
     pickle.dump(chunks, f)
 
-print("Index built successfully.")
+print(f"Index built successfully. {index.ntotal} vectors stored.")

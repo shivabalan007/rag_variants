@@ -9,7 +9,7 @@ class DecisionEngine:
         if faithfulness_result.strip().upper() != "YES":
             return "RETRY"
 
-        if relevance.strip().upper() != "YES":
+        if relevance_result.strip().upper() != "YES":
             return "RETRY"
             
         return "ACCEPT"

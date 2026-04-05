@@ -3,30 +3,20 @@ def build_prompt(query, chunks):
     for i, chunk in enumerate(chunks):
         context_text += f"[{i+1}] {chunk}\n\n"
 
-    prompt = f"""
-You are a helpful assistant that answers questions based on the provided context.
-You are a factual question answering assistant. You should only answer based on the provided context. 
+    prompt = f"""You are a factual assistant. Answer the question using ONLY the provided context.
 
 Rules:
-- Use ONLY the information provided in the context.
-- Do NOT use any external information or prior knowledge.
-- If the answer is not contained in the context, say:
-    "I don't know based on the provided context."
-- Provide a concise answer
-- Do NOT repeat sentence and the answer.
-- Do NOT speculates
-- Cite sources using [number].
--Cite at least one source in each answer.
-- If multiple sources support the same answer, cite all relevant sources.
-
+- Answer directly and concisely.
+- Use ONLY information from the context. Do not use prior knowledge.
+- Cite the source number(s) like [1] or [2] inline.
+- If the context does not contain the answer, respond with exactly:
+  I don't know based on the provided context.
+- Do not hedge, speculate, or add caveats.
+- Do not repeat the question.
 
 Context:
 {context_text}
-
 Question: {query}
+Answer:"""
 
-Answer:
-"""
-    
-    return prompt.strip()
-
+    return prompt
