@@ -1,7 +1,6 @@
 import streamlit as st
 import faiss
 import pickle
-import tempfile
 import os
 
 from ingestion.base import Document
@@ -14,6 +13,7 @@ from retrieval.reranker import CrossEncoderReranker
 
 from rag_v1 import run_rag_v1
 from rag_v2 import run_rag_v2
+from rag_v3 import run_rag_v3
 
 
 st.set_page_config(
@@ -40,23 +40,19 @@ def load_system():
 
 
 def process_uploaded_file(uploaded_file, embedder):
-    """Chunk and index an uploaded file, return new store and chunks."""
-
-    # Read file content
     content = uploaded_file.read().decode("utf-8", errors="ignore")
 
-    # Chunk
     new_chunks = []
     semantic_chunks = semantic_chunk(content)
     for sc in semantic_chunks:
         window_chunks = sliding_window_chunk(sc, chunk_size=300, overlap=50)
         for chunk in window_chunks:
-            new_chunks.append(Document(text=chunk, metadata={"source": uploaded_file.name}))
+            new_chunks.append(Document(
+                text=chunk,
+                metadata={"source": uploaded_file.name}
+            ))
 
-    # Embed
     embeddings = embedder.embed_documents(new_chunks)
-
-    # Build new store
     dim = embeddings.shape[1]
     new_store = VectorStore(dim)
     new_store.add(embeddings)
@@ -66,7 +62,7 @@ def process_uploaded_file(uploaded_file, embedder):
 
 embedder, store, chunks, reranker = load_system()
 
-# Initialize session state
+# ── Session state init ────────────────────────────────────────────────────────
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -83,108 +79,169 @@ if "pipeline" not in st.session_state:
     st.session_state.pipeline = "RAG v1 - Simple"
 
 
-# SIDEBAR
+# ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.header("Advanced RAG")
 
-    # PIPELINE SWITCHER                                     # FEATURE 2
-    st.subheader("Pipeline")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("RAG v1", use_container_width=True):
-            st.session_state.pipeline = "RAG v1 - Simple"
-            st.rerun()
-    with col2:
-        if st.button("RAG v2", use_container_width=True):
-            st.session_state.pipeline = "RAG v2 - Agentic"
-            st.rerun()
-
-    st.caption(f"Active: {st.session_state.pipeline}")
-
-    st.divider()
-
-    # DOCUMENT UPLOAD                                       # FEATURE 1
-    st.subheader("Documents")
-
-    uploaded_file = st.file_uploader(
-        "Upload a document",
-        type=["txt", "pdf", "csv"]
-    )
-
-    if uploaded_file is not None:
-        if uploaded_file.name != st.session_state.uploaded_filename:
-            with st.spinner("Indexing document..."):
-                new_chunks, new_store = process_uploaded_file(uploaded_file, embedder)
-                st.session_state.uploaded_chunks = new_chunks
-                st.session_state.uploaded_store = new_store
-                st.session_state.uploaded_filename = uploaded_file.name
-                st.session_state.messages = []          # clear chat on new doc
-            st.success(f"Indexed: {uploaded_file.name} — {len(new_chunks)} chunks")
-
-        active_chunks = st.session_state.uploaded_chunks
-        active_store = st.session_state.uploaded_store
-        active_filename = st.session_state.uploaded_filename
-    else:
-        active_chunks = chunks
-        active_store = store
-        active_filename = "test1.txt"
-
-    st.divider()
-    st.caption(f"Document: {active_filename}")
-    st.caption(f"Chunks: {len(active_chunks)}")
-
-    # NEW CHAT BUTTON                                       # FEATURE 2
-    if st.button("New Chat", use_container_width=True):
+    if st.button("+ New Chat", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
 
+    st.divider()
 
-# MAIN AREA
-st.title("Advanced RAG System")
-st.caption(f"Pipeline: {st.session_state.pipeline} | Document: {active_filename} | Chunks: {len(active_chunks)}")
+    # Chat history
+    if st.session_state.messages:
+        st.caption("Recent")
+        user_messages = [
+            m["content"] for m in st.session_state.messages
+            if m["role"] == "user"
+        ]
+        for msg in user_messages[-5:]:                      # show last 5 questions
+            label = msg[:35] + "..." if len(msg) > 35 else msg
+            st.markdown(
+                f'<div style="font-size:12px;padding:6px 8px;color:var(--color-text-secondary);">'
+                f'{label}</div>',
+                unsafe_allow_html=True
+            )
 
-st.divider()
+    st.divider()
 
-# Display chat messages                                     # FEATURE 3
+    # Pipeline selector
+    st.caption("Pipeline")
+    for label, key in [
+        ("RAG v1 — Simple",   "RAG v1 - Simple"),
+        ("RAG v2 — Agentic",  "RAG v2 - Agentic"),
+        ("RAG v3 — LangChain","RAG v3 - LangChain"),
+    ]:
+        active = st.session_state.pipeline == key
+        if st.button(
+            label,
+            use_container_width=True,
+            type="primary" if active else "secondary"
+        ):
+            st.session_state.pipeline = key
+            st.rerun()
+
+
+# ── LANDING PAGE — no document uploaded ──────────────────────────────────────
+if st.session_state.uploaded_filename is None:
+
+    st.markdown("<br><br>", unsafe_allow_html=True)
+
+    _, col, _ = st.columns([1, 2, 1])
+
+    with col:
+        st.markdown(
+            "<h2 style='text-align:center;font-weight:500;'>"
+            "What would you like to explore?</h2>",
+            unsafe_allow_html=True
+        )
+
+        st.chat_input(
+            "Upload a document to start chatting...",
+            disabled = True,
+            key="landing_chat"
+        )
+        
+        st.markdown(
+            "<p style='text-align:center;color:var(--color-text-secondary);"
+            "font-size:14px;margin-bottom:24px;'>"
+            "Upload a document to start asking questions</p>",
+            unsafe_allow_html=True
+        )
+
+        uploaded_file = st.file_uploader(
+            "label",
+            type=["txt", "pdf", "csv"],
+            label_visibility="collapsed",
+            key="landing_upload"
+        )
+
+        st.markdown(
+            "<div style='text-align:center;font-size:11px;"
+            "color:var(--color-text-tertiary);margin-top:8px;'>"
+            "Supported formats: TXT · PDF · CSV</div>",
+            unsafe_allow_html=True
+        )
+
+        if uploaded_file is not None:
+            with st.spinner(f"Indexing {uploaded_file.name}..."):
+                new_chunks, new_store = process_uploaded_file(
+                    uploaded_file, embedder
+                )
+                st.session_state.uploaded_chunks = new_chunks
+                st.session_state.uploaded_store = new_store
+                st.session_state.uploaded_filename = uploaded_file.name
+                st.session_state.messages = []
+            st.rerun()
+
+    st.stop()
+
+
+# ── ACTIVE DOCUMENT ───────────────────────────────────────────────────────────
+active_chunks   = st.session_state.uploaded_chunks
+active_store    = st.session_state.uploaded_store
+active_filename = st.session_state.uploaded_filename
+
+
+# ── MAIN AREA ─────────────────────────────────────────────────────────────────
+st.markdown(
+    f"<div style='display:flex;align-items:center;justify-content:space-between;"
+    f"padding-bottom:8px;border-bottom:0.5px solid var(--color-border-tertiary);'>"
+    f"<span style='font-size:18px;font-weight:500;'>Advanced RAG System</span>"
+    f"<div style='display:flex;gap:8px;'>"
+    f"<span style='font-size:11px;padding:3px 10px;border-radius:20px;"
+    f"background:#E6F1FB;color:#0C447C;'>{st.session_state.pipeline}</span>"
+    f"<span style='font-size:11px;padding:3px 10px;border-radius:20px;"
+    f"background:#EAF3DE;color:#27500A;'>{active_filename}</span>"
+    f"<span style='font-size:11px;padding:3px 10px;border-radius:20px;"
+    f"background:#EEEDFE;color:#3C3489;'>{len(active_chunks)} chunks</span>"
+    f"</div></div>",
+    unsafe_allow_html=True
+)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# Display chat messages
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         if message["role"] == "assistant" and "|||" in message["content"]:
             parts = message["content"].split("|||")
-            st.write(parts[0])                              # answer
+            st.write(parts[0])
             with st.expander("Sources"):
-                st.caption(parts[1])                        # sources
-            st.caption(parts[2])                            # evaluation
+                st.caption(parts[1])
+            st.caption(parts[2])
         else:
             st.write(message["content"])
 
-# Chat input
+# ── CHAT INPUT ────────────────────────────────────────────────────────────────
 query = st.chat_input("Ask a question about your document...")
 
 if query:
-    # 1. Add user message
     st.session_state.messages.append({
         "role": "user",
         "content": query
     })
 
-    # 2. Display user message immediately
     with st.chat_message("user"):
         st.write(query)
 
-    # 3. Run RAG with spinner
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
             if st.session_state.pipeline == "RAG v1 - Simple":
                 answer, faithfulness, relevance = run_rag_v1(
                     query, embedder, active_store, active_chunks, reranker
                 )
-            else:
+            elif st.session_state.pipeline == "RAG v2 - Agentic":
                 answer, faithfulness, relevance = run_rag_v2(
                     query, embedder, active_store, active_chunks
                 )
+            else:
+                answer, faithfulness, relevance = run_rag_v3(
+                    query, embedder, active_store, active_chunks, reranker
+                )
 
-    # 4. Store answer + sources + evaluation together using ||| separator
-    eval_line = f"Faithfulness: {faithfulness} | Relevance: {relevance}"
+    eval_line    = f"Faithfulness: {faithfulness} | Relevance: {relevance}"
     sources_line = f"Retrieved from: {active_filename}"
 
     st.session_state.messages.append({
