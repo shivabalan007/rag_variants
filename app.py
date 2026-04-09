@@ -78,6 +78,9 @@ if "uploaded_filename" not in st.session_state:
 if "pipeline" not in st.session_state:
     st.session_state.pipeline = "RAG v1 - Simple"
 
+if "first_question" not in st.session_state:        # FIX 1: track only first question
+    st.session_state.first_question = None
+
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -85,33 +88,35 @@ with st.sidebar:
 
     if st.button("+ New Chat", use_container_width=True):
         st.session_state.messages = []
+        st.session_state.first_question = None         # FIX 1: reset on new chat
         st.rerun()
 
     st.divider()
 
-    # Chat history
-    if st.session_state.messages:
+    # FIX 1: show only first question in recent
+    if st.session_state.first_question:
         st.caption("Recent")
-        user_messages = [
-            m["content"] for m in st.session_state.messages
-            if m["role"] == "user"
-        ]
-        for msg in user_messages[-5:]:                      # show last 5 questions
-            label = msg[:35] + "..." if len(msg) > 35 else msg
-            st.markdown(
-                f'<div style="font-size:12px;padding:6px 8px;color:var(--color-text-secondary);">'
-                f'{label}</div>',
-                unsafe_allow_html=True
-            )
+        label = (
+            st.session_state.first_question[:35] + "..."
+            if len(st.session_state.first_question) > 35
+            else st.session_state.first_question
+        )
+        st.markdown(
+            f'<div style="font-size:12px;padding:6px 8px;'
+            f'background:var(--color-background-primary);'
+            f'border-radius:6px;color:var(--color-text-primary);">'
+            f'{label}</div>',
+            unsafe_allow_html=True
+        )
 
     st.divider()
 
     # Pipeline selector
     st.caption("Pipeline")
     for label, key in [
-        ("RAG v1 — Simple",   "RAG v1 - Simple"),
-        ("RAG v2 — Agentic",  "RAG v2 - Agentic"),
-        ("RAG v3 — LangChain","RAG v3 - LangChain"),
+        ("RAG v1 — Simple",    "RAG v1 - Simple"),
+        ("RAG v2 — Agentic",   "RAG v2 - Agentic"),
+        ("RAG v3 — LangChain", "RAG v3 - LangChain"),
     ]:
         active = st.session_state.pipeline == key
         if st.button(
@@ -123,29 +128,32 @@ with st.sidebar:
             st.rerun()
 
 
-# ── LANDING PAGE — no document uploaded ──────────────────────────────────────
+# ── LANDING PAGE ──────────────────────────────────────────────────────────────
 if st.session_state.uploaded_filename is None:
 
-    st.markdown("<br><br>", unsafe_allow_html=True)
+    # FIX 2: bold title on landing page
+    st.markdown(
+        "<h1 style='text-align:center;font-weight:700;margin-top:80px;'>"
+        "Advanced RAG System</h1>",
+        unsafe_allow_html=True
+    )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # FIX 3: full width chat bar on landing — no columns
+    st.chat_input(
+        "Upload a document below to start chatting...",
+        disabled=True,
+        key="landing_chat"
+    )
+
+    st.markdown("<br>", unsafe_allow_html=True)
 
     _, col, _ = st.columns([1, 2, 1])
-
     with col:
         st.markdown(
-            "<h2 style='text-align:center;font-weight:500;'>"
-            "What would you like to explore?</h2>",
-            unsafe_allow_html=True
-        )
-
-        st.chat_input(
-            "Upload a document to start chatting...",
-            disabled = True,
-            key="landing_chat"
-        )
-        
-        st.markdown(
             "<p style='text-align:center;color:var(--color-text-secondary);"
-            "font-size:14px;margin-bottom:24px;'>"
+            "font-size:14px;margin-bottom:16px;'>"
             "Upload a document to start asking questions</p>",
             unsafe_allow_html=True
         )
@@ -173,6 +181,7 @@ if st.session_state.uploaded_filename is None:
                 st.session_state.uploaded_store = new_store
                 st.session_state.uploaded_filename = uploaded_file.name
                 st.session_state.messages = []
+                st.session_state.first_question = None
             st.rerun()
 
     st.stop()
@@ -185,10 +194,11 @@ active_filename = st.session_state.uploaded_filename
 
 
 # ── MAIN AREA ─────────────────────────────────────────────────────────────────
+# FIX 2: bold title on chat page
 st.markdown(
     f"<div style='display:flex;align-items:center;justify-content:space-between;"
     f"padding-bottom:8px;border-bottom:0.5px solid var(--color-border-tertiary);'>"
-    f"<span style='font-size:18px;font-weight:500;'>Advanced RAG System</span>"
+    f"<span style='font-size:20px;font-weight:700;'>Advanced RAG System</span>"
     f"<div style='display:flex;gap:8px;'>"
     f"<span style='font-size:11px;padding:3px 10px;border-radius:20px;"
     f"background:#E6F1FB;color:#0C447C;'>{st.session_state.pipeline}</span>"
@@ -218,6 +228,10 @@ for message in st.session_state.messages:
 query = st.chat_input("Ask a question about your document...")
 
 if query:
+    # FIX 1: save only the first question
+    if st.session_state.first_question is None:
+        st.session_state.first_question = query
+
     st.session_state.messages.append({
         "role": "user",
         "content": query
