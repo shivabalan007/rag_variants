@@ -20,3 +20,7 @@ class GeminiLLM:
             },
         )
         return response.text
+    
+"""
+Alternative LLM client using Google Gemini API. Second LLM backend — can swap with OpenRouter client when needed.
+"""

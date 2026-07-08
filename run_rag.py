@@ -137,3 +137,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+"""
+Entry point for RAG v1 from command line. Runs full pipeline — ingest, chunk, embed, store, query, evaluate and prints result.
+"""

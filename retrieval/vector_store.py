@@ -20,3 +20,7 @@ class VectorStore:
 
     def load(self, path: str):
         self.index = faiss.read_index(f"{path}/faiss_index")
+
+"""
+Wraps FAISS index with add() and search() methods. Stores chunk embeddings and returns top-k nearest neighbors for a query vector.
+"""

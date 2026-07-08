@@ -52,3 +52,7 @@ if __name__ == "__main__":
         print(f"Metadata: {chunk.metadata}")
         print(f"Chunk text: {chunk.text[:200]}...\n")
         print("--------------")
+
+"""
+Standalone script to test retrieval pipeline on a query. Useful for debugging retrieval quality before connecting to generation.
+"""

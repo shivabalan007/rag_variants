@@ -42,3 +42,7 @@ class AgenticRAG:
                 return state.answer
             
         return "I don't know based on the provided context."
+    
+"""
+Alternative state-based agent implementation. Manages pipeline stages as explicit state transitions with error handling per stage.
+"""

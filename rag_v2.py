@@ -12,3 +12,7 @@ def run_rag_v2(query, embedder, store, chunks):
     result = pipeline.run(query)
 
     return result.answer, result.faithfulness, result.relevance 
+
+"""
+Wrapper function for RAG v2 used by Streamlit. Instantiates RAGPipeline with caching so model loads only once across calls.
+"""

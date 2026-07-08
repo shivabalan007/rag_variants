@@ -39,3 +39,7 @@ if __name__ == "__main__":
 
     print("Scores:", scores)
     print("Indices:", indices)
+
+"""
+Standalone script to build and save FAISS vector store from chunks. Early version of build_index.py before artifacts pattern was added.
+"""

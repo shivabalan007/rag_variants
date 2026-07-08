@@ -20,3 +20,7 @@ def load_csv(path: str):
         )
 
     return documents
+
+"""
+Reads .csv files and converts each row into a Document object. Useful for structured data like FAQs or knowledge bases.
+"""

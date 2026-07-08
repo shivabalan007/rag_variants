@@ -14,3 +14,7 @@ def generate_answer(query, retrieved_chunks):
     response = llm(prompt, temperature=0.1)
 
     return response.strip()
+
+"""
+Takes query and retrieved texts, builds prompt, calls LLM, returns answer. Main generation function called by all three RAG pipelines.
+"""

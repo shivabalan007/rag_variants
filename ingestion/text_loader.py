@@ -17,3 +17,7 @@ def load_txt(path: str):
             )
         )
     return documents
+
+"""
+Reads .txt files from disk and returns list of Document objects. Sets source filename in metadata for citation tracking.
+"""

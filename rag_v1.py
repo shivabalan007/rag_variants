@@ -29,3 +29,8 @@ def run_rag_v1(query, embedder, store, chunks, reranker):
     relevance = check_relevance(query, answer)
 
     return answer, faithfulness, relevance
+
+
+"""
+Wrapper function for RAG v1 used by Streamlit. Takes query, embedder, store, chunks, reranker and returns answer, faithfulness, relevance.
+"""

@@ -20,3 +20,7 @@ Question: {query}
 Answer:"""
 
     return prompt
+
+"""
+Builds the RAG prompt by formatting retrieved chunks as numbered context. Strict rules — answer only from context, cite sources, no speculation.
+"""

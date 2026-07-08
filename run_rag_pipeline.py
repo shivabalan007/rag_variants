@@ -59,3 +59,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+"""
+Entry point for RAG v2 agentic pipeline from command line. Uses RAGPipeline class with stage-based orchestration and retry logic.
+"""

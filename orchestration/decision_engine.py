@@ -13,3 +13,7 @@ class DecisionEngine:
             return "RETRY"
             
         return "ACCEPT"
+    
+"""
+Takes overlap score, faithfulness, and relevance — returns ACCEPT or RETRY. Three-signal decision logic — all three must pass for answer to be accepted.
+"""

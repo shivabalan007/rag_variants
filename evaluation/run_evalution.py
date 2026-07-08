@@ -48,3 +48,7 @@ if __name__ == "__main__":
 
     print("\n=== BAD ANSWER EVALUATION ===\n")
     run_overlap_evaluation(query, retrieved_chunks, bad_answer)
+
+"""
+Early standalone evaluation script — predecessor to eval_runner.py. Kept for reference but superseded by the full metrics runner.
+"""

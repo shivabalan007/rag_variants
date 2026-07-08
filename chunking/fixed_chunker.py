@@ -27,3 +27,7 @@ def fixed_chunk_document(doc: Document, config: ChunkConfig):
         chunk_id += 1
         
     return chunks
+
+"""
+Splits document into fixed-size character chunks with overlap. Simple baseline chunker — used in early version.
+"""

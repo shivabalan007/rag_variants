@@ -9,7 +9,7 @@ def load_pdf(path: str):
     for page_num, page in enumerate(reader.pages):
         text = page.extract_text()
 
-        if not text or not text.split():
+        if not text or not text.split(): # Handles blank page
             continue
 
         doc = Document(
@@ -23,3 +23,7 @@ def load_pdf(path: str):
         documents.append(doc)
 
     return documents
+
+"""
+Reads .pdf files using a PDF library and extracts raw text per page. Returns list of Document objects with page number in metadata.
+"""

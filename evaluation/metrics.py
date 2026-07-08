@@ -59,3 +59,7 @@ def rouge_score(generated_answer, expected_answer):
     scorer = rouge_scorer.RougeScorer(["rougeL"], use_stemmer=True)
     scores = scorer.score(expected_answer, generated_answer)
     return round(scores["rougeL"].fmeasure, 3)
+
+"""
+Implements Precision@K, Recall@K, MRR, and ROUGE-L scoring functions. Used by eval runner to measure retrieval and generation quality against ground truth.
+"""

@@ -1,7 +1,6 @@
 import streamlit as st
 import faiss
 import pickle
-import os
 
 from ingestion.base import Document
 from chunking.semantic_chunker import semantic_chunk
@@ -62,7 +61,7 @@ def process_uploaded_file(uploaded_file, embedder):
 
 embedder, store, chunks, reranker = load_system()
 
-# ── Session state init ────────────────────────────────────────────────────────
+# Session state 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -82,7 +81,7 @@ if "first_question" not in st.session_state:        # FIX 1: track only first qu
     st.session_state.first_question = None
 
 
-# ── SIDEBAR ───────────────────────────────────────────────────────────────────
+# ── SIDEBAR 
 with st.sidebar:
     st.header("Advanced RAG")
 
@@ -128,7 +127,7 @@ with st.sidebar:
             st.rerun()
 
 
-# ── LANDING PAGE ──────────────────────────────────────────────────────────────
+# ── LANDING PAGE 
 if st.session_state.uploaded_filename is None:
 
     # FIX 2: bold title on landing page
@@ -187,13 +186,13 @@ if st.session_state.uploaded_filename is None:
     st.stop()
 
 
-# ── ACTIVE DOCUMENT ───────────────────────────────────────────────────────────
+# ── ACTIVE DOCUMENT 
 active_chunks   = st.session_state.uploaded_chunks
 active_store    = st.session_state.uploaded_store
 active_filename = st.session_state.uploaded_filename
 
 
-# ── MAIN AREA ─────────────────────────────────────────────────────────────────
+# ── MAIN AREA 
 # FIX 2: bold title on chat page
 st.markdown(
     f"<div style='display:flex;align-items:center;justify-content:space-between;"
@@ -224,7 +223,7 @@ for message in st.session_state.messages:
         else:
             st.write(message["content"])
 
-# ── CHAT INPUT ────────────────────────────────────────────────────────────────
+# ── CHAT INPUT 
 query = st.chat_input("Ask a question about your document...")
 
 if query:
@@ -264,3 +263,7 @@ if query:
     })
 
     st.rerun()
+
+"""
+Main Streamlit UI — ChatGPT-style chat interface with sidebar pipeline switcher and document upload. Supports all three RAG versions with evaluation display per answer.
+"""

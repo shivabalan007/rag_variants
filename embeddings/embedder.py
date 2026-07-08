@@ -26,3 +26,8 @@ class Embedder:
             normalize_embeddings=self.config.normalize
         )
         return embedding
+
+
+"""
+Loads sentence transformer model and provides embed_documents() and embed_query() methods. Converts text chunks and queries into 384-dimensional vectors.
+"""

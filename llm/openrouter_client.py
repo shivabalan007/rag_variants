@@ -12,7 +12,8 @@ client = OpenAI(
 def llm(prompt, temperature=0.1):
 
     completion = client.chat.completions.create(
-        model="deepseek/deepseek-chat",
+        #model="deepseek/deepseek-chat",
+        model="poolside/laguna-m.1:free",
         messages=[{"role": "user", "content": prompt}],
         temperature=temperature,
         max_tokens=800,
@@ -25,3 +26,7 @@ def llm(prompt, temperature=0.1):
     # meta-llama/llama-3-8b-instruct
     # meta-llama/llama-3-70b-instruct
     # mistralai/mistral-large
+
+"""
+OpenAI-compatible client pointed at OpenRouter API with DeepSeek model. Single llm(prompt, temperature) function used by all evaluators and generator.
+"""

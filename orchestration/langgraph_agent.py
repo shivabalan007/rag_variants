@@ -202,3 +202,7 @@ def build_langgraph_agent(embedder, store, chunks, similarity_threshold=0.5):
     )
 
     return graph.compile()
+
+"""
+LangGraph-based pipeline implementation using state machine nodes. Experimental variant — each RAG stage is a LangGraph node with conditional edges.
+"""

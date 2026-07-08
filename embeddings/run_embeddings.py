@@ -29,4 +29,6 @@ if __name__ == "__main__":
     print(f"Embeddings shape: {embeddings.shape}")
 
 
-    
+"""
+Standalone script to test embedding generation on sample chunks. Used during development to verify embedding shape and quality.
+"""

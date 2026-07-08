@@ -24,3 +24,7 @@ if __name__ == "__main__":
         print("---")
         print(c.metadata)
         print(c.text[:200])
+
+"""
+Standalone script to test chunking strategies on a document. Useful for debugging chunk quality before running the full pipeline.
+"""

@@ -32,3 +32,7 @@ def semantic_chunk(text, threshold=0.7):
     chunks.append(".".join(current_chunk))
 
     return chunks
+
+"""
+Splits text at semantic boundaries — paragraph breaks and topic shifts. Preserves meaning by keeping related sentences together in the same chunk.
+"""

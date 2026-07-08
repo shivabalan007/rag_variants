@@ -20,3 +20,7 @@ if __name__ == "__main__":
         print("---")
         print(d.metadata)
         print(d.text[:200])
+
+"""
+Router that picks the correct loader based on file extension. Call ingest("file.pdf") and it automatically uses the right loader.
+"""

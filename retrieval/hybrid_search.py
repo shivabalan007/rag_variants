@@ -1,4 +1,8 @@
+import time
+
 from rank_bm25 import BM25Okapi
+
+from core.retrieval_result import RetrievalResult
 
 
 class HybridRetriever:
@@ -11,14 +15,23 @@ class HybridRetriever:
 
     def hybrid_search(self, query, vector_store, embedder, top_k=10):
 
-        # -------- Vector Search --------
+        start_time = time.perf_counter()
+
+        # -------------------------------
+        # Dense Retrieval (FAISS)
+        # -------------------------------
+
         query_vector = embedder.embed_query(query)
 
-        v_scores, v_indices = vector_store.search(query_vector, top_k)
+        vector_scores, vector_indices = vector_store.search(
+            query_vector,
+            top_k
+        )
 
-        vector_chunks = [self.chunks[i] for i in v_indices[0]]
+        # -------------------------------
+        # Sparse Retrieval (BM25)
+        # -------------------------------
 
-        # -------- BM25 Search --------
         tokenized_query = query.split()
 
         bm25_scores = self.bm25.get_scores(tokenized_query)
@@ -29,16 +42,65 @@ class HybridRetriever:
             reverse=True
         )[:top_k]
 
-        bm25_chunks = [self.chunks[i] for i in bm25_indices]
+        # -------------------------------
+        # Merge Results
+        # -------------------------------
 
-        # -------- Combine results --------
-        combined = []
+        result = RetrievalResult()
 
-        for v, b in zip(vector_chunks, bm25_chunks):
-            combined.append(v)
-            combined.append(b)
+        added_chunks = set()
 
-        # remove duplicates
-        unique_chunks = list({chunk.text: chunk for chunk in combined}.values())
+        # Add FAISS results
+        for score, index in zip(vector_scores[0], vector_indices[0]):
 
-        return unique_chunks[:15]
+            if index == -1:
+                continue
+
+            chunk = self.chunks[index]
+
+            if chunk.text in added_chunks:
+                continue
+
+            added_chunks.add(chunk.text)
+
+            result.add_chunk(
+                chunk=chunk,
+                vector_score=float(score),
+                bm25_score=0.0,
+            )
+
+        # Add BM25 results
+        for index in bm25_indices:
+
+            chunk = self.chunks[index]
+
+            if chunk.text in added_chunks:
+
+                # Update existing BM25 score
+                for item in result.retrieved_chunks:
+                    if item.chunk.text == chunk.text:
+                        item.bm25_score = float(bm25_scores[index])
+                        break
+
+            else:
+
+                added_chunks.add(chunk.text)
+
+                result.add_chunk(
+                    chunk=chunk,
+                    vector_score=0.0,
+                    bm25_score=float(bm25_scores[index]),
+                )
+
+        result.retrieval_latency = (
+            time.perf_counter() - start_time
+        )
+
+        return result
+
+
+"""
+Performs hybrid retrieval by combining FAISS semantic search and BM25 keyword
+search into a RetrievalResult. Preserves chunk-to-score relationships so
+routing, monitoring, memory, and reranking can reuse the same retrieval data.
+"""

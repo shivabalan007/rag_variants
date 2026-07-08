@@ -3,62 +3,102 @@ from typing import List, Optional, Any
 
 
 @dataclass
+class RetrievedChunk:
+    """
+    Stores one retrieved document together with
+    all scores collected during retrieval.
+    """
+
+    chunk: Any
+
+    vector_score: float = 0.0
+
+    bm25_score: float = 0.0
+
+    rerank_score: float = 0.0
+
+
+@dataclass
 class RetrievalResult:
     """
-    Stores everything produced during the retrieval stage.
+    Stores the complete output of the retrieval stage.
 
-    Every future module (Router, Monitoring, Memory,
-    Web Fallback, Evaluation) should read from this object
-    instead of recomputing retrieval information.
+    This object is passed through the pipeline so
+    Router, Monitoring, Memory and Evaluation
+    can reuse the same retrieval information.
     """
 
-    # Retrieved Documents
-    chunks: List[Any] = field(default_factory=list)
-
-
-    # Vector Search
-    vector_scores: List[float] = field(default_factory=list)
-
-    # BM25 Search
-    bm25_scores: List[float] = field(default_factory=list)
-
-    # CrossEncoder
-    rerank_scores: List[float] = field(default_factory=list)
+    # Retrieved chunks with all scores
+    retrieved_chunks: List[RetrievedChunk] = field(default_factory=list)
 
     # Metadata
     retrieved_count: int = 0
 
     retrieval_latency: float = 0.0
+
     rerank_latency: float = 0.0
 
-    source: str = "document"
+    # --------------------------
+    # Helper Methods
+    # --------------------------
 
-    # Future Fields
-    web_results: Optional[List[Any]] = None
+    def add_chunk(
+        self,
+        chunk,
+        vector_score: float = 0.0,
+        bm25_score: float = 0.0,
+    ):
 
-    confidence: float = 0.0
+        self.retrieved_chunks.append(
+            RetrievedChunk(
+                chunk=chunk,
+                vector_score=vector_score,
+                bm25_score=bm25_score,
+            )
+        )
 
-    route: Optional[str] = None
+        self.retrieved_count = len(self.retrieved_chunks)
 
-    reason: Optional[str] = None
+    def get_chunks(self):
+
+        return [
+            item.chunk
+            for item in self.retrieved_chunks
+        ]
 
     def top_vector_score(self):
-        if not self.vector_scores:
+
+        if not self.retrieved_chunks:
             return 0.0
-        return max(self.vector_scores)
+
+        return max(
+            item.vector_score
+            for item in self.retrieved_chunks
+        )
 
     def top_bm25_score(self):
-        if not self.bm25_scores:
+
+        if not self.retrieved_chunks:
             return 0.0
-        return max(self.bm25_scores)
+
+        return max(
+            item.bm25_score
+            for item in self.retrieved_chunks
+        )
 
     def top_rerank_score(self):
-        if not self.rerank_scores:
+
+        if not self.retrieved_chunks:
             return 0.0
-        return max(self.rerank_scores)
+
+        return max(
+            item.rerank_score
+            for item in self.retrieved_chunks
+        )
 
     def has_documents(self):
-        return len(self.chunks) > 0
+
+        return len(self.retrieved_chunks) > 0
     
 """
 Stores all retrieval outputs (chunks, vector scores, BM25 scores, rerank scores, latency, metadata) in a single object. Prevents information loss between retrieval stages and supports routing, monitoring, memory, and future production features.

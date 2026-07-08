@@ -136,3 +136,7 @@ class RAGPipeline:
         state.decision = "REFUSE"
 
         return state
+    
+"""
+Full RAG v2 agentic pipeline — six stages: rewrite, retrieve, rerank, generate, evaluate, decide. Retry loop expands top_k from 10 to 15 on second attempt.
+"""

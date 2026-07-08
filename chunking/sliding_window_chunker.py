@@ -15,3 +15,7 @@ def sliding_window_chunk(text, chunk_size=300, overlap=100):
         start += chunk_size - overlap
 
     return chunks
+
+"""
+Takes a text string and splits into overlapping windows of fixed size. Overlap ensures context at chunk boundaries is not lost between adjacent chunks.
+"""

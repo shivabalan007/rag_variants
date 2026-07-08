@@ -17,3 +17,7 @@ def context_overlap_score(answer, context_chunks):
     score = len(overlap) / len(answer_tokens)
 
     return score 
+
+"""
+Computes keyword overlap score between generated answer and retrieved chunks. Non-LLM signal — fast, deterministic, unbiased by the same model that generated the answer.
+"""

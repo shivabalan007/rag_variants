@@ -19,3 +19,7 @@ Answer:
 
     result = llm(prompt, temperature=0.0)
     return result.strip().upper()
+
+"""
+Asks LLM whether every core claim in the answer is supported by retrieved context. Returns YES or NO — catches hallucinations and unsupported statements.
+"""

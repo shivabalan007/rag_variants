@@ -43,3 +43,8 @@ with open("artifacts/chunks.pkl", "wb") as f:
     pickle.dump(chunks, f)
 
 print(f"Index built successfully. {index.ntotal} vectors stored.")
+
+
+"""
+Builds FAISS index and chunks from test1.txt using semantic + sliding window chunking. Saves artifacts to artifacts/ folder for Streamlit to load.
+"""

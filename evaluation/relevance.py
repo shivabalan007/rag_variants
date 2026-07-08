@@ -16,3 +16,7 @@ Answer:
 
     result = llm(prompt, temperature=0.0)
     return result.strip().upper()
+
+"""
+Asks LLM whether the answer directly addresses the user's question. Returns YES or NO — catches off-topic or evasive answers.
+"""

@@ -105,3 +105,7 @@ def run_rag_v3(query, embedder, store, chunks, reranker):
     relevance = check_relevance(query, answer)
 
     return answer, faithfulness, relevance
+
+"""
+Wrapper function for RAG v3 LangChain LCEL pipeline used by Streamlit. Builds and runs LangChain chain — rewrite, retrieve, rerank, prompt, LLM, parse.
+"""
