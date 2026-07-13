@@ -95,8 +95,13 @@ class RAGV3Pipeline:
 
     def generate(self, state: AgentState):
 
-    # LOW confidence 
+    # LOW confidence -> Direct Web Search
         if state.confidence_level == "LOW":
+        
+            print("\n========== WEB FALLBACK ==========")
+            print("Reason :", "Low retrieval confidence")
+            print("Confidence :", state.route_confidence)
+
 
             state.web_result = self.web_searcher.search(state.rewritten_query)
 
@@ -118,7 +123,7 @@ class RAGV3Pipeline:
 
             return state
 
-    # HIGH / MEDIUM confidence
+    # HIGH / MEDIUM -> Document Answer
 
         texts = [
             item.chunk.text
@@ -136,6 +141,10 @@ class RAGV3Pipeline:
     # Automatic Web fallback
 
         if state.answer.startswith("I don't know"):
+
+            print("\n========== WEB FALLBACK ==========")
+            print("Reason :", "Document answer unavailable")
+            print("Confidence :", state.route_confidence)
 
             state.web_result = self.web_searcher.search(state.rewritten_query)
 
@@ -167,11 +176,24 @@ class RAGV3Pipeline:
             state.relevance = "NO"
 
             return state
+        
+        # Document Answer
 
-        texts = [
-            item.chunk.text
-            for item in state.retrieval_result.retrieved_chunks
-        ]
+        if state.answer_source == "Document":
+
+            texts = [
+                item.chunk.text
+                for item in state.retrieval_result.retrieved_chunks
+            ]
+
+        # Web Answer
+
+        else:
+            texts = [
+                source.content
+                for source in state.web_result.sources
+            ]
+
 
         state.overlap = context_overlap_score(
             state.answer,
@@ -342,6 +364,15 @@ if __name__ == "__main__":
 
         print("\nAnswer")
         print(state.answer)
+
+        if state.answer_source == "Web":
+
+            print("\nSources")
+
+            for i, source in enumerate(state.web_result.sources, 1):
+
+                print(f"{i}. {source.title}")
+                print(f"   {source.url}")
 
         print("\nEvaluation")
         print("Overlap      :", state.overlap)
