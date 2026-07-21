@@ -1,7 +1,7 @@
 from orchestration.agent_state import AgentState
 from retrieval.query_rewriter import rewrite_query
 from retrieval.hybrid_search import HybridRetriever
-from retrieval.reranker import CrossEncoderReranker
+from retrieval.reranker_legacy import CrossEncoderReranker
 from llm.generator import generate_answer
 
 from evaluation.overlap import context_overlap_score
@@ -35,12 +35,18 @@ class RAGPipeline:
 
     # Stage 2: Retrieve
     def retrieve(self, state: AgentState, top_k):
-        state.candidate_chunks = self.hybrid_retriever.hybrid_search(
-            state.rewritten_query,
-            self.store,
-            self.embedder,
-            top_k=top_k                                     # FIX 1: use parameter, not hardcoded 10
-        )
+        retrieval_result = self.hybrid_retriever.hybrid_search(
+        state.rewritten_query,
+        self.store,
+        self.embedder,
+        top_k=top_k
+    )
+
+        state.candidate_chunks = [
+            item.chunk
+            for item in retrieval_result.retrieved_chunks
+        ]
+
         return state
 
     # Stage 3: Rerank
@@ -48,6 +54,13 @@ class RAGPipeline:
         if not state.candidate_chunks:
             state.reranked_chunks = []
             return state
+        candidate_chunks = state.candidate_chunks
+
+        if hasattr(candidate_chunks, "retrieved_chunks"):
+            candidate_chunks = [
+                item.chunk
+                for item in candidate_chunks.retrieved_chunks
+            ]
 
         reranked = self.reranker.rerank(
             state.rewritten_query,

@@ -9,10 +9,15 @@ from embeddings.base import EmbeddingConfig
 from embeddings.embedder import Embedder
 from retrieval.vector_store import VectorStore
 from retrieval.reranker import CrossEncoderReranker
+from retrieval.reranker_legacy import CrossEncoderReranker as LegacyReranker
+
 
 from rag_v1 import run_rag_v1
 from rag_v2 import run_rag_v2
 from rag_v3 import run_rag_v3
+
+legacy_reranker = LegacyReranker()
+
 
 
 st.set_page_config(
@@ -214,14 +219,151 @@ st.markdown("<br>", unsafe_allow_html=True)
 # Display chat messages
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
-        if message["role"] == "assistant" and "|||" in message["content"]:
-            parts = message["content"].split("|||")
-            st.write(parts[0])
-            with st.expander("Sources"):
-                st.caption(parts[1])
-            st.caption(parts[2])
+        if message["role"] == "assistant":
+            # RAG V3
+            if "answer" in message:
+                st.write(message["answer"])
+
+                pipeline = message["pipeline"]
+                metrics = pipeline["metrics"]
+                retrieval = pipeline["retrieval"]
+
+                source_name = "Unknown"
+
+                if (retrieval and retrieval.retrieved_chunks and len(retrieval.retrieved_chunks) > 0):
+                    source_name = retrieval.retrieved_chunks[0].chunk.metadata.get(
+                        "source",
+                        "Unknown"
+                    )
+                
+                level = pipeline["confidence_level"]
+
+                if level == "HIGH":
+                    st.success("🟢 HIGH Confidence")
+                elif level == "MEDIUM":
+                    st.warning("🟡 MEDIUM Confidence")
+                else:
+                    st.error("🔴 LOW Confidence")
+                
+                # Pipeline Details
+                with st.expander("Pipeline Details", expanded=True):
+
+                    st.markdown(
+                        f"""
+                    📄 **Route:** `{pipeline["route"]}`
+
+                    🎯 **Confidence:** `{pipeline["confidence"]:.3f}` (**{level}**)
+
+                    📚 **Answer Source:** `{pipeline["answer_source"]}`
+
+                    📄 **File:** `{source_name}`
+                    """
+                    )
+
+                    st.write("**Reason:**", pipeline["reason"])
+
+                    if pipeline["warning"]:
+                        st.warning(pipeline["warning"])
+
+                    if pipeline.get("rewritten_query"):
+                        st.divider()
+                        st.subheader("Rewritten Query")
+                        st.code(pipeline["rewritten_query"])
+                    
+                    st.divider()
+
+                    st.write("### Evaluation")
+
+                    if metrics.faithfulness == "YES":
+                        st.success("Faithfulness : YES")
+                    else:
+                        st.error("Faithfulness : NO")
+
+                    if metrics.relevance == "YES":
+                        st.success("Relevance : YES")
+                    else:
+                        st.error("Relevance : NO")
+
+                    st.info(f"Overlap : {pipeline['overlap']:.3f}")
+
+                    st.divider()
+
+                    st.write("### Monitoring")
+
+                    metrics = pipeline["metrics"]
+
+                    st.write("**Retrieval Latency:**", f"{metrics.retrieval_latency:.3f} sec")
+                    st.write("**Rerank Latency:**", f"{metrics.rerank_latency:.3f} sec")
+                    st.write("**Generation Latency:**", f"{metrics.generation_latency:.3f} sec")
+                    st.write("**Total Latency:**", f"{metrics.total_latency:.3f} sec")
+                    
+                    st.divider()
+                    st.write("### Token Usage")
+
+                    st.write("Prompt Tokens :", metrics.prompt_tokens)
+                    st.write("Completion Tokens :", metrics.completion_tokens)
+                    st.write("Total Tokens :", metrics.total_tokens)
+                    st.write("Estimated Cost :", f"${metrics.estimated_cost:.6f}")
+
+                    st.divider()
+                    
+                    st.write("### Retrieved Chunks")
+                    
+
+                    for i, item in enumerate(retrieval.retrieved_chunks, 1):
+            
+                        with st.expander(f"Chunk {i} | Rerank: {item.rerank_score:.2f} | Vector: {item.vector_score:.2f}"):
+
+                            st.write("Vector Score :", item.vector_score)
+                            st.write("BM25 Score :", item.bm25_score)
+                            st.write("Rerank Score :", item.rerank_score)
+
+                            if hasattr(item, "chunk"):
+                                st.caption(item.chunk.text[:250] + "...")
+
+                    st.divider()       
+                    
+                    with st.expander("Pipeline Execution"):
+                        st.markdown("✅ Query Received")
+                        st.markdown(f"➡️ Route Selected : **{pipeline['route']}**")
+                        st.markdown(f"➡️ Retrieved {len(retrieval.retrieved_chunks)} chunks")
+                        st.markdown("➡️ Cross Encoder Reranking")
+                        st.markdown(f"➡️ Answer Generated from **{pipeline['answer_source']}**")
+                        st.markdown(f"✅ Confidence : **{pipeline['confidence_level']}**")
+                        st.divider()
+
+                if pipeline["web_result"]:
+                    with st.expander("Web Search"):
+                        st.write("**Provider:**", pipeline["web_result"].provider)
+                        st.write("**Results:**", pipeline["web_result"].result_count)
+                        st.write( "**Latency:**",f"{pipeline['web_result'].search_latency:.3f} sec")
+
+                        st.write("### Sources")
+
+                        for source in pipeline["web_result"].sources:
+                            st.markdown(
+                                f"- [{source.title}]({source.url})"
+                            )
+
+            # RAG v1 / RAG v2
+            elif "content" in message and "|||" in message["content"]:
+
+                parts = message["content"].split("|||")
+
+                st.write(parts[0])
+
+                with st.expander("Sources"):
+                    st.caption(parts[1])
+
+                st.caption(parts[2])
+            
+            else:
+                st.write(message["content"])
+
         else:
             st.write(message["content"])
+
+
 
 # ── CHAT INPUT 
 query = st.chat_input("Ask a question about your document...")
@@ -243,25 +385,51 @@ if query:
         with st.spinner("Thinking..."):
             if st.session_state.pipeline == "RAG v1 - Simple":
                 answer, faithfulness, relevance = run_rag_v1(
-                    query, embedder, active_store, active_chunks, reranker
+                    query, embedder, active_store, active_chunks, legacy_reranker
                 )
             elif st.session_state.pipeline == "RAG v2 - Agentic":
                 answer, faithfulness, relevance = run_rag_v2(
                     query, embedder, active_store, active_chunks
                 )
             else:
-                answer, faithfulness, relevance = run_rag_v3(
-                    query, embedder, active_store, active_chunks, reranker
+                state = run_rag_v3(
+                    query,embedder,active_store,active_chunks,reranker
                 )
+                answer = state.answer
+                faithfulness = state.faithfulness
+                relevance = state.relevance
+                pipeline_details = {
+                "route": state.route,
+                "reason": state.route_reason,
+                "confidence": state.route_confidence,
+                "confidence_level": state.confidence_level,
+                "answer_source": state.answer_source,
+                "warning": state.warning,
+                "overlap": state.overlap,
+                "metrics": state.metrics,
+                "retrieval": state.retrieval_result,
+                "web_result": state.web_result,
+            }
 
-    eval_line    = f"Faithfulness: {faithfulness} | Relevance: {relevance}"
-    sources_line = f"Retrieved from: {active_filename}"
 
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": f"{answer}|||{sources_line}|||{eval_line}"
-    })
+    if st.session_state.pipeline == "RAG v3 - LangChain":
 
+        st.session_state.messages.append({
+            "role": "assistant",
+            "answer": answer,
+            "pipeline": pipeline_details
+        })
+
+    else:
+
+        eval_line = f"Faithfulness: {faithfulness} | Relevance: {relevance}"
+        sources_line = f"Retrieved from: {active_filename}"
+
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": f"{answer}|||{sources_line}|||{eval_line}"
+        })
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
     st.rerun()
 
 """

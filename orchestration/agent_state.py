@@ -35,6 +35,9 @@ class AgentState:
         self.attempt = 0
         self.decision = None
 
+        #Monitoring
+        self.metrics = None
+
 """
 Defines AgentState dataclass that holds all pipeline state — query, chunks, answer, scores, decision, attempt number. Passed between every stage in RAG v2.
 """

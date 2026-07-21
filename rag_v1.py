@@ -2,6 +2,7 @@ from retrieval.query_rewriter import rewrite_query
 from llm.generator import generate_answer
 from evaluation.faithfulness import check_faithfulness
 from evaluation.relevance import check_relevance
+from retrieval.reranker_legacy import CrossEncoderReranker
 
 def run_rag_v1(query, embedder, store, chunks, reranker):
 
