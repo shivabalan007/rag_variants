@@ -12,7 +12,7 @@ def semantic_chunk(text, threshold=0.7):
 
     chunks = []
     current_chunk = [sentences[0]]
-
+    
     for i in range(1, len(sentences)):
 
         sim = np.dot(

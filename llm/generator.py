@@ -2,13 +2,13 @@ from llm.openrouter_client import llm
 from llm.prompt import build_prompt
 
 
-def generate_answer(query, retrieved_chunks):
+def generate_answer(query, retrieved_chunks, conversation_history=None):
 
     if not retrieved_chunks:
         return "I don't know based on the provided context."
 
     # Build the RAG prompt
-    prompt = build_prompt(query, retrieved_chunks)
+    prompt = build_prompt(query, retrieved_chunks, conversation_history)
 
     # Call LLM
     response = llm(prompt, temperature=0.1)

@@ -1,22 +1,134 @@
 from llm.openrouter_client import llm
 
+
 def check_relevance(query, answer):
-    prompt = f"""You are an evaluator checking if an answer addresses the question.
 
-Rules:
-- If the answer directly addresses what the question is asking, respond YES.
-- If the answer is off-topic or says "I don't know", respond NO.
-- Respond ONLY with YES or NO. Nothing else.
+    prompt = f"""
+You are an expert RAG evaluation assistant.
 
-Question:
+Your task is to determine whether the generated answer actually answers the user's question.
+
+==================================================
+User Question
+==================================================
+
 {query}
 
+==================================================
+Generated Answer
+==================================================
+
+{answer}
+
+==================================================
+Evaluation Rules
+==================================================
+
+Evaluate ONLY whether the answer addresses the user's question.
+
+Return:
+
+YES
+
+if the answer:
+
+- directly answers the question
+- stays on the requested topic
+- provides useful information related to the question
+- partially answers the question while remaining relevant
+
+Return:
+
+NO
+
+if the answer:
+
+- is unrelated to the question
+- changes the subject
+- avoids answering
+- is generic without addressing the query
+- only repeats the question
+- says:
+  "I don't know based on the provided context."
+- refuses without answering
+- discusses a different topic
+
+Ignore:
+
+- grammar
+- writing style
+- formatting
+- citations such as [1] or [2]
+- answer length
+
+Examples
+
+Question:
+What is Python?
+
 Answer:
-{answer}"""
+Python is an interpreted programming language.
 
-    result = llm(prompt, temperature=0.0)
+YES
+
+Question:
+What is Python?
+
+Answer:
+Python was created by Guido van Rossum and is widely used.
+
+YES
+
+Question:
+What is Python?
+
+Answer:
+Java is an object-oriented language.
+
+NO
+
+Question:
+What is Python?
+
+Answer:
+I don't know based on the provided context.
+
+NO
+
+Question:
+Explain OOP.
+
+Answer:
+Object-Oriented Programming organizes software around objects.
+
+YES
+
+==================================================
+Output Rules
+==================================================
+
+Return ONLY ONE WORD.
+
+Allowed outputs:
+
+YES
+
+NO
+
+Do not explain.
+
+Do not justify.
+
+Do not output punctuation.
+
+"""
+
+    result = llm(
+        prompt,
+        temperature=0.0
+    )
+
     return result.strip().upper()
-
 """
 Asks LLM whether the answer directly addresses the user's question. Returns YES or NO — catches off-topic or evasive answers.
 """

@@ -1,6 +1,7 @@
 import streamlit as st
 import faiss
 import pickle
+import uuid
 
 from ingestion.base import Document
 from chunking.semantic_chunker import semantic_chunk
@@ -11,10 +12,14 @@ from retrieval.vector_store import VectorStore
 from retrieval.reranker import CrossEncoderReranker
 from retrieval.reranker_legacy import CrossEncoderReranker as LegacyReranker
 
+from memory.short_term import ShortTermMemory
 
 from rag_v1 import run_rag_v1
 from rag_v2 import run_rag_v2
 from rag_v3 import run_rag_v3
+
+from database.init_db import init_database
+init_database()
 
 legacy_reranker = LegacyReranker()
 
@@ -39,6 +44,8 @@ def load_system():
     store.index = index
 
     reranker = CrossEncoderReranker()
+
+    memory = ShortTermMemory(max_messages=20)
 
     return embedder, store, chunks, reranker
 
@@ -85,6 +92,9 @@ if "pipeline" not in st.session_state:
 if "first_question" not in st.session_state:        # FIX 1: track only first question
     st.session_state.first_question = None
 
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
+
 
 # ── SIDEBAR 
 with st.sidebar:
@@ -92,7 +102,8 @@ with st.sidebar:
 
     if st.button("+ New Chat", use_container_width=True):
         st.session_state.messages = []
-        st.session_state.first_question = None         # FIX 1: reset on new chat
+        st.session_state.first_question = None   
+        st.session_state.session_id = str(uuid.uuid4())
         st.rerun()
 
     st.divider()
@@ -228,6 +239,8 @@ for message in st.session_state.messages:
                 metrics = pipeline["metrics"]
                 retrieval = pipeline["retrieval"]
 
+                is_knowledge = (pipeline["answer_source"] == "Knowledge")
+
                 source_name = "Unknown"
 
                 if (retrieval and retrieval.retrieved_chunks and len(retrieval.retrieved_chunks) > 0):
@@ -238,8 +251,11 @@ for message in st.session_state.messages:
                 
                 level = pipeline["confidence_level"]
 
-                if level == "HIGH":
+                if not is_knowledge:
+                    st.info(f"🔵 {pipeline['answer_source']} Response")
+                elif level == "HIGH":
                     st.success("🟢 HIGH Confidence")
+
                 elif level == "MEDIUM":
                     st.warning("🟡 MEDIUM Confidence")
                 else:
@@ -248,19 +264,37 @@ for message in st.session_state.messages:
                 # Pipeline Details
                 with st.expander("Pipeline Details", expanded=True):
 
+                    confidence = (
+                        f"{pipeline['confidence']:.3f}"
+                        if pipeline["confidence"] is not None
+                        else "N/A"
+                    )
+
+                    route = (
+                        pipeline["route"]
+                        if pipeline["route"] is not None
+                        else "N/A"
+                    )
+
+                    confidence_level = (
+                        pipeline["confidence_level"]
+                        if pipeline["confidence_level"] is not None
+                        else "N/A"
+                    )
+
                     st.markdown(
                         f"""
-                    📄 **Route:** `{pipeline["route"]}`
+                📄 **Route:** `{route}`
 
-                    🎯 **Confidence:** `{pipeline["confidence"]:.3f}` (**{level}**)
+                🎯 **Confidence:** `{confidence}` (**{confidence_level}**)
 
-                    📚 **Answer Source:** `{pipeline["answer_source"]}`
+                📚 **Answer Source:** `{pipeline["answer_source"]}`
 
-                    📄 **File:** `{source_name}`
+                📄 **File:** `{source_name}`
                     """
                     )
 
-                    st.write("**Reason:**", pipeline["reason"])
+                    st.write("**Reason:**", pipeline["reason"] if pipeline["reason"] else "N/A")
 
                     if pipeline["warning"]:
                         st.warning(pipeline["warning"])
@@ -270,30 +304,36 @@ for message in st.session_state.messages:
                         st.subheader("Rewritten Query")
                         st.code(pipeline["rewritten_query"])
                     
-                    st.divider()
+                    if is_knowledge:
+                        st.divider()
 
-                    st.write("### Evaluation")
+                        st.write("### Evaluation")
 
-                    if metrics.faithfulness == "YES":
-                        st.success("Faithfulness : YES")
+                        if metrics.faithfulness == "YES":
+                            st.success("Faithfulness : YES")
+                        else:
+                            st.error("Faithfulness : NO")
+
+                        if metrics.relevance == "YES":
+                            st.success("Relevance : YES")
+                        else:
+                            st.error("Relevance : NO")
+
+                        st.info(f"Overlap : {pipeline['overlap']:.3f}")
+
                     else:
-                        st.error("Faithfulness : NO")
+                        st.divider()
 
-                    if metrics.relevance == "YES":
-                        st.success("Relevance : YES")
-                    else:
-                        st.error("Relevance : NO")
-
-                    st.info(f"Overlap : {pipeline['overlap']:.3f}")
+                        st.info("Evaluation not applicable.")
 
                     st.divider()
-
                     st.write("### Monitoring")
 
                     metrics = pipeline["metrics"]
 
-                    st.write("**Retrieval Latency:**", f"{metrics.retrieval_latency:.3f} sec")
-                    st.write("**Rerank Latency:**", f"{metrics.rerank_latency:.3f} sec")
+                    if is_knowledge:
+                        st.write("**Retrieval Latency:**", f"{metrics.retrieval_latency:.3f} sec")
+                        st.write("**Rerank Latency:**", f"{metrics.rerank_latency:.3f} sec")
                     st.write("**Generation Latency:**", f"{metrics.generation_latency:.3f} sec")
                     st.write("**Total Latency:**", f"{metrics.total_latency:.3f} sec")
                     
@@ -305,45 +345,59 @@ for message in st.session_state.messages:
                     st.write("Total Tokens :", metrics.total_tokens)
                     st.write("Estimated Cost :", f"${metrics.estimated_cost:.6f}")
 
-                    st.divider()
+                    if is_knowledge:
+                        st.divider()
                     
-                    st.write("### Retrieved Chunks")
+                        st.write("### Retrieved Chunks")
                     
 
-                    for i, item in enumerate(retrieval.retrieved_chunks, 1):
+                        for i, item in enumerate(retrieval.retrieved_chunks, 1):
             
-                        with st.expander(f"Chunk {i} | Rerank: {item.rerank_score:.2f} | Vector: {item.vector_score:.2f}"):
+                            with st.expander(f"Chunk {i} | Rerank: {item.rerank_score:.2f} | Vector: {item.vector_score:.2f}"):
 
-                            st.write("Vector Score :", item.vector_score)
-                            st.write("BM25 Score :", item.bm25_score)
-                            st.write("Rerank Score :", item.rerank_score)
+                                st.write("Vector Score :", item.vector_score)
+                                st.write("BM25 Score :", item.bm25_score)
+                                st.write("Rerank Score :", item.rerank_score)
 
-                            if hasattr(item, "chunk"):
-                                st.caption(item.chunk.text[:250] + "...")
+                                if hasattr(item, "chunk"):
+                                    st.caption(item.chunk.text[:250] + "...")
 
                     st.divider()       
                     
                     with st.expander("Pipeline Execution"):
                         st.markdown("✅ Query Received")
-                        st.markdown(f"➡️ Route Selected : **{pipeline['route']}**")
-                        st.markdown(f"➡️ Retrieved {len(retrieval.retrieved_chunks)} chunks")
-                        st.markdown("➡️ Cross Encoder Reranking")
-                        st.markdown(f"➡️ Answer Generated from **{pipeline['answer_source']}**")
-                        st.markdown(f"✅ Confidence : **{pipeline['confidence_level']}**")
+
+                        if is_knowledge:
+                            st.markdown(f"➡️ Route Selected : **{pipeline['route']}**")
+                            st.markdown(f"➡️ Retrieved {len(retrieval.retrieved_chunks)} chunks")
+                            st.markdown("➡️ Cross Encoder Reranking")
+                            st.markdown(f"➡️ Answer Generated from **{pipeline['answer_source']}**")
+                            st.markdown(f"✅ Confidence : **{pipeline['confidence_level']}**")
+                        else:
+                            st.markdown(
+                                f"➡️ Intent : "
+                                f"**{pipeline['answer_source']}**"
+                            )
+
+                            st.markdown(
+                                f"➡️ Answer Generated from "
+                                f"**{pipeline['answer_source']}**"
+                            )
                         st.divider()
 
-                if pipeline["web_result"]:
-                    with st.expander("Web Search"):
-                        st.write("**Provider:**", pipeline["web_result"].provider)
-                        st.write("**Results:**", pipeline["web_result"].result_count)
-                        st.write( "**Latency:**",f"{pipeline['web_result'].search_latency:.3f} sec")
+                    if pipeline["web_result"]:
+                        st.divider()
+                        with st.expander("Web Search"):
+                            st.write("**Provider:**", pipeline["web_result"].provider)
+                            st.write("**Results:**", pipeline["web_result"].result_count)
+                            st.write( "**Latency:**",f"{pipeline['web_result'].search_latency:.3f} sec")
 
-                        st.write("### Sources")
+                            st.write("### Sources")
 
-                        for source in pipeline["web_result"].sources:
-                            st.markdown(
-                                f"- [{source.title}]({source.url})"
-                            )
+                            for source in pipeline["web_result"].sources:
+                                st.markdown(
+                                    f"- [{source.title}]({source.url})"
+                                )
 
             # RAG v1 / RAG v2
             elif "content" in message and "|||" in message["content"]:
@@ -393,7 +447,7 @@ if query:
                 )
             else:
                 state = run_rag_v3(
-                    query,embedder,active_store,active_chunks,reranker
+                    query=query,embedder=embedder,store=active_store,chunks=active_chunks, session_id=st.session_state.session_id
                 )
                 answer = state.answer
                 faithfulness = state.faithfulness
@@ -432,6 +486,5 @@ if query:
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
     st.rerun()
 
-"""
-Main Streamlit UI — ChatGPT-style chat interface with sidebar pipeline switcher and document upload. Supports all three RAG versions with evaluation display per answer.
-"""
+
+# Main Streamlit UI — ChatGPT-style chat interface with sidebar pipeline switcher and document upload. Supports all three RAG versions with evaluation display per answer.

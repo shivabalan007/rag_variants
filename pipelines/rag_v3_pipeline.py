@@ -11,31 +11,145 @@ from evaluation.faithfulness import check_faithfulness
 from evaluation.relevance import check_relevance
 
 from core.router import QueryRouter
+from core.intent_router import IntentRouter
 
 from web.search import WebSearcher
 
 from monitoring.metrics import PipelineMetrics
 from monitoring.logger import PipelineLogger
 from monitoring.latency import LatencyTracker
-from  monitoring.cost_tracker import CostTracker
+from monitoring.cost_tracker import CostTracker
 
 
 class RAGV3Pipeline:
 
-    def __init__(self, embedder, store, chunks):
+    def __init__(self, embedder, store, chunks, memory):
 
         self.embedder = embedder
         self.store = store
         self.chunks = chunks
+        self.memory = memory
 
         self.hybrid_retriever = HybridRetriever(chunks)
-        self.reranker = CrossEncoderReranker()
+        self.reranker = CrossEncoderReranker()        
         self.router = QueryRouter()
+        self.intent_router = IntentRouter()
         self.web_searcher = WebSearcher()
 
         self.metrics_logger = PipelineLogger()
         self.latency_tracker = LatencyTracker()
         self.cost_tracker = CostTracker()
+
+    def detect_intent(self, state):
+    
+            state.intent = self.intent_router.classify(
+                query=state.original_query,
+                conversation_history=state.conversation_history
+            )
+    
+            print("\n========== INTENT ==========")
+            print(f"Intent : {state.intent}")
+    
+            return state
+
+
+    def general_chat(self, state: AgentState):
+
+        history = ""
+
+        for message in state.conversation_history:
+            history += (
+                f"{message['role'].capitalize()}: "
+                f"{message['content']}\n"
+            )
+
+        prompt = f"""
+    You are a friendly AI assistant.
+
+    Conversation History:
+    {history if history else "No previous conversation."}
+
+    User:
+    {state.original_query}
+
+    Respond naturally.
+
+    Do not use document retrieval.
+
+    Answer:
+    """
+
+        from llm.openrouter_client import llm
+
+        state.answer = llm(prompt, temperature=0.5)
+
+        state.answer_source = "General"
+
+        return state
+
+
+    def memory_chat(self, state: AgentState):
+
+        history = ""
+
+        for message in state.conversation_history:
+            history += (
+                f"{message['role'].capitalize()}: "
+                f"{message['content']}\n"
+            )
+
+        prompt = f"""
+    You are a Conversation Memory Assistant.
+
+    Your only job is to answer question using the conversation history below.
+    =======================
+    Conversation History:
+    =======================
+    {history if history else "No previous conversation."}
+    ======================
+    CurrentUser Question:
+    ======================
+    {state.original_query}
+
+    Instructions:
+
+    1. Treat the conversation history as the only source of truth.
+
+    2. Carefully search the history before answering.
+
+    3. User messages may contain personal facts such as:
+        - name
+        - age
+        - preferences
+        - goals
+        - previous questions
+        - previous answers
+
+    4. If the answer exists anywhere in the conversation history,
+       answer naturally using ONLY that information.
+
+    5. Do NOT invent, assume, or use outside knowledge.
+
+    6. If the answer cannot be found in the conversation history,
+       reply with EXACTLY:
+
+    I don't remember that from our conversation.
+
+    7. Return only the answer.
+    Do not explain your reasoning.
+    Do not mention the conversation history.
+    Do not add extra commentary.
+
+    Answer:
+    """
+
+        from llm.openrouter_client import llm
+
+        state.answer = llm(prompt,temperature=0.0)
+
+        state.answer_source = "Memory"
+
+        return state
 
     # Stage 1 : Rewrite Query
 
@@ -43,7 +157,8 @@ class RAGV3Pipeline:
         self.latency_tracker.start("rewrite")
 
         state.rewritten_query = rewrite_query(
-            state.original_query
+            query=state.original_query,
+            conversation_history=state.conversation_history
         )
         
         self.latency_tracker.stop("rewrite")
@@ -144,7 +259,7 @@ class RAGV3Pipeline:
                 for source in state.web_result.sources
             ]
 
-            state.answer = generate_answer(state.rewritten_query,texts)
+            state.answer = generate_answer(query=state.rewritten_query,retrieved_chunks=texts,conversation_history=state.conversation_history)
 
             state.answer_source = "Web"
 
@@ -161,7 +276,7 @@ class RAGV3Pipeline:
             for item in state.retrieval_result.retrieved_chunks
         ]
 
-        state.answer = generate_answer(state.rewritten_query,texts)
+        state.answer = generate_answer(query=state.rewritten_query,retrieved_chunks=texts,conversation_history=state.conversation_history)
 
         if state.confidence_level == "MEDIUM":
 
@@ -190,7 +305,7 @@ class RAGV3Pipeline:
                     for source in state.web_result.sources
                 ]
 
-                state.answer = generate_answer(state.rewritten_query,texts)
+                state.answer = generate_answer(query=state.rewritten_query,retrieved_chunks=texts,conversation_history=state.conversation_history)
 
                 state.answer_source = "Web"
 
@@ -256,39 +371,33 @@ class RAGV3Pipeline:
         self.latency_tracker.stop("evaluate")
 
         return state
+    
 
     # Stage 7 : Monitoring
+
     def monitor(self, state: AgentState):
 
         """
-        Phase 3
-
-        Monitor
-
-        - latency
-        - cost
-        - tokens
-        - route
-        - confidence
+        latency, cost, tokens, route, confidence
         """
 
         return state
 
     # Stage 8 : Memory
+    def load_memory(self, state: AgentState):
 
-    def memory(self, state: AgentState):
-
-        """
-        Phase 2
-
-        Redis
-
-        PostgreSQL
-
-        Mem0
-        """
+        state.conversation_history = self.memory.get_history()
 
         return state
+    
+    def save_memory(self, state: AgentState):
+
+        self.memory.add_message(role="user", content=state.original_query)
+        if state.answer:
+            self.memory.add_message(role="assistant", content=state.answer)
+        return state
+
+    
 
     # Pipeline Runner
 
@@ -298,23 +407,41 @@ class RAGV3Pipeline:
 
         state = AgentState(query)
 
-        state = self.rewrite(state)
+        state.conversation_history = self.memory.get_history()
 
-        state = self.retrieve(state)
+        state = self.detect_intent(state)
 
-        state = self.rerank(state)
+        if state.intent == "general":
+            state = self.general_chat(state)
 
-        state = self.route(state)
+        elif state.intent == "memory":
+            state = self.memory_chat(state)
 
-        state = self.generate(state)
+        else:
 
-        state = self.evaluate(state)
+            state = self.rewrite(state)
+
+            state = self.retrieve(state)
+
+            state = self.rerank(state)
+
+            state = self.route(state)
+
+            print("="*60)
+            print(state.conversation_history)
+            print("="*60)
+
+            state = self.generate(state)
+
+            state = self.evaluate(state)
 
         state = self.monitor(state)
 
-        state = self.memory(state)
+        self.memory.add_message(role="user", content=state.original_query)
 
-        metrics = PipelineMetrics()
+        self.memory.add_message(role="assistant",content=state.answer)
+
+        metrics = PipelineMetrics()  # Metrics
 
         metrics.query = state.original_query
         metrics.rewritten_query = state.rewritten_query
@@ -324,28 +451,20 @@ class RAGV3Pipeline:
         metrics.confidence = state.route_confidence
         metrics.confidence_level = state.confidence_level
 
-        metrics.retrieved_chunks = (
-            state.retrieval_result.retrieved_count
-        )
+        if state.retrieval_result: # Knowledge only
 
-        metrics.retrieval_latency = (
-            state.retrieval_result.retrieval_latency
-        )
+            metrics.retrieved_chunks = (state.retrieval_result.retrieved_count)
 
-        metrics.rerank_latency = (
-            state.retrieval_result.rerank_latency
-        )
+            metrics.retrieval_latency = (state.retrieval_result.retrieval_latency)
 
-        metrics.generation_latency = (
-            self.latency_tracker.get("generate")
-        )
+            metrics.rerank_latency = (state.retrieval_result.rerank_latency)
+
+        metrics.generation_latency = (self.latency_tracker.get("generate"))
 
         print("\nTracked Latencies:")
         print(self.latency_tracker.as_dict())
 
-        metrics.total_latency = (
-            self.latency_tracker.total()
-        )
+        metrics.total_latency = (self.latency_tracker.total())
 
         metrics.overlap = state.overlap
         metrics.faithfulness = state.faithfulness

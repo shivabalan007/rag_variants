@@ -13,7 +13,7 @@ def llm(prompt, temperature=0.1):
 
     completion = client.chat.completions.create(
         #model="deepseek/deepseek-chat",
-        model="cohere/north-mini-code:free",
+        model="poolside/laguna-s-2.1:free",
         messages=[{"role": "user", "content": prompt}],
         temperature=temperature,
         max_tokens=800,

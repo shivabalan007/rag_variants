@@ -1,57 +1,52 @@
 from pipelines.rag_v3_pipeline import RAGV3Pipeline
 
-_pipeline = None
+from memory.short_term import ShortTermMemory
+from memory.long_term import LongTermMemory
+from memory.manager import MemoryManager
 
 
-def run_rag_v3(query, embedder, store, chunks, reranker=None):
-    """
-    Execute the Advanced Agentic RAG V3 pipeline.
+_pipeline = {}
 
-    Parameters
-    ----------
-    query : str
-        User question.
 
-    embedder : Embedder
-        SentenceTransformer embedder.
-
-    store : VectorStore
-        FAISS vector store wrapper.
-
-    chunks : list
-        Indexed document chunks.
-
-    reranker : CrossEncoderReranker, optional
-        Not required here because RAGV3Pipeline creates its own reranker.
-        Kept only for compatibility with the existing Streamlit app.
-
-    Returns
-    -------
-    AgentState
-        Final pipeline state containing:
-        - answer
-        - rewritten_query
-        - retrieval_result
-        - routing decision
-        - confidence
-        - answer source
-        - web search result
-        - evaluation
-        - monitoring metrics
-    """
-
+def run_rag_v3(query, embedder, store, chunks, session_id, user_id="default_user"):
     global _pipeline
 
-    # Create pipeline only once
-    if _pipeline is None:
-        _pipeline = RAGV3Pipeline(
-            embedder=embedder,
-            store=store.index,
-            chunks=chunks
+    print("="*60)
+    print("Session ID :", session_id)
+    print("Pipelines :", list(_pipeline.keys()))
+    print("="*60)
+
+    if session_id not in _pipeline:
+        print(">>> Creating NEW Pipeline")
+
+
+        short_memory = ShortTermMemory(max_messages=20)
+        long_memory = LongTermMemory()
+
+        memory = MemoryManager(
+            short_memory=short_memory,
+            long_memory=long_memory,
+            session_id=session_id,
+            user_id=user_id
         )
 
+        print(">>> Calling load_session()")
+        memory.load_session()
+
+
+        _pipeline[session_id] = RAGV3Pipeline(
+            embedder=embedder,
+            store=store.index,
+            chunks=chunks,
+            memory=memory
+        )
+    else:
+        print(">>> Reusing Existing Pipeline")
+
+
+
     # Execute pipeline
-    state = _pipeline.run(query)
+    state = _pipeline[session_id].run(query)
 
     return state
 

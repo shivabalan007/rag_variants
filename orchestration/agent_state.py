@@ -1,6 +1,8 @@
 class AgentState:
     def __init__(self, query: str):
 
+        self.intent = None
+
         #User input
         self.original_query = query
         self.rewritten_query = None
@@ -25,6 +27,9 @@ class AgentState:
         
         #Generation
         self.answer = None
+
+        # Memory
+        self.conversation_history = []
 
         #Evaluation
         self.overlap = None
