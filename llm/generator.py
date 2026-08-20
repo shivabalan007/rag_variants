@@ -13,6 +13,9 @@ def generate_answer(query, retrieved_chunks, conversation_history=None):
     # Call LLM
     response = llm(prompt, temperature=0.1)
 
+    if response is None:
+        return "I couldn't generate a response."
+
     return response.strip()
 
 """

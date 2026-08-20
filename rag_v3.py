@@ -4,11 +4,15 @@ from memory.short_term import ShortTermMemory
 from memory.long_term import LongTermMemory
 from memory.manager import MemoryManager
 
+from retrieval.pg_vector_store import PGVectorStore
+from retrieval.pg_hybrid_search import PGHybridRetriever
+
+
 
 _pipeline = {}
 
 
-def run_rag_v3(query, embedder, store, chunks, session_id, user_id="default_user"):
+def run_rag_v3(query, embedder, session_id, user_id="default_user"):
     global _pipeline
 
     print("="*60)
@@ -20,7 +24,7 @@ def run_rag_v3(query, embedder, store, chunks, session_id, user_id="default_user
         print(">>> Creating NEW Pipeline")
 
 
-        short_memory = ShortTermMemory(max_messages=20)
+        short_memory = ShortTermMemory(session_id=session_id, max_messages=20)
         long_memory = LongTermMemory()
 
         memory = MemoryManager(
@@ -33,16 +37,19 @@ def run_rag_v3(query, embedder, store, chunks, session_id, user_id="default_user
         print(">>> Calling load_session()")
         memory.load_session()
 
+        pg_store = PGVectorStore()
+
+        pg_hybrid_retriever = PGHybridRetriever(vector_store=pg_store,auto_refresh=False)
 
         _pipeline[session_id] = RAGV3Pipeline(
             embedder=embedder,
-            store=store.index,
-            chunks=chunks,
-            memory=memory
+            store=pg_store,
+            chunks=None,
+            memory=memory,
+            hybrid_retriever=pg_hybrid_retriever
         )
     else:
         print(">>> Reusing Existing Pipeline")
-
 
 
     # Execute pipeline

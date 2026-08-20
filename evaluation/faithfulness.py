@@ -1,4 +1,4 @@
-from llm.openrouter_client import llm
+from llm.groq_client import llm
 
 
 def check_faithfulness(query, answer, context_chunks):
@@ -100,7 +100,6 @@ Do not explain.
 Do not justify.
 
 Do not output punctuation.
-
 """
 
     result = llm(
@@ -108,8 +107,21 @@ Do not output punctuation.
         temperature=0.0
     )
 
-    return result.strip().upper()
+    # LLM/provider failure.
+    # Do not crash the RAG pipeline.
+    if result is None:
+        return "N/A"
+
+    result = result.strip().upper()
+
+    # Protect against unexpected model output.
+    if result not in {"YES", "NO"}:
+        return "N/A"
+
+    return result
+
 
 """
-Asks LLM whether every core claim in the answer is supported by retrieved context. Returns YES or NO — catches hallucinations and unsupported statements.
+Asks LLM whether every core claim in the answer is supported by retrieved
+context. Returns YES, NO, or N/A when the evaluation LLM is unavailable.
 """

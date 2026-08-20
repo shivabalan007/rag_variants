@@ -9,10 +9,9 @@ from chunking.sliding_window_chunker import sliding_window_chunk
 from embeddings.base import EmbeddingConfig
 from embeddings.embedder import Embedder
 from retrieval.vector_store import VectorStore
+from retrieval.pg_vector_store import PGVectorStore
 from retrieval.reranker import CrossEncoderReranker
 from retrieval.reranker_legacy import CrossEncoderReranker as LegacyReranker
-
-from memory.short_term import ShortTermMemory
 
 from rag_v1 import run_rag_v1
 from rag_v2 import run_rag_v2
@@ -45,30 +44,53 @@ def load_system():
 
     reranker = CrossEncoderReranker()
 
-    memory = ShortTermMemory(max_messages=20)
-
     return embedder, store, chunks, reranker
 
 
 def process_uploaded_file(uploaded_file, embedder):
-    content = uploaded_file.read().decode("utf-8", errors="ignore")
 
+    content = uploaded_file.read().decode("utf-8",errors="ignore")
     new_chunks = []
     semantic_chunks = semantic_chunk(content)
+
     for sc in semantic_chunks:
-        window_chunks = sliding_window_chunk(sc, chunk_size=300, overlap=50)
+        window_chunks = sliding_window_chunk(sc,chunk_size=300,overlap=50)
         for chunk in window_chunks:
-            new_chunks.append(Document(
-                text=chunk,
-                metadata={"source": uploaded_file.name}
-            ))
+            new_chunks.append(
+                Document(
+                    text=chunk,
+                    metadata={
+                        "source": uploaded_file.name
+                    }
+                )
+            )
+
+    if not new_chunks:
+        raise ValueError("No chunks were created from the uploaded file.")
 
     embeddings = embedder.embed_documents(new_chunks)
+    # V1 / V2 → FAISS
     dim = embeddings.shape[1]
-    new_store = VectorStore(dim)
-    new_store.add(embeddings)
+    faiss_store = VectorStore(dim)
+    faiss_store.add(embeddings)
 
-    return new_chunks, new_store
+    # V3 → PostgreSQL + pgvector
+    document_id = str(uuid.uuid4())
+    pg_store = PGVectorStore()
+
+    pg_store.add(
+        document_id=document_id,
+        filename=uploaded_file.name,
+        chunks=new_chunks,
+        embeddings=embeddings
+    )
+
+    return (
+        new_chunks,
+        faiss_store,
+        pg_store,
+        document_id
+    )
 
 
 embedder, store, chunks, reranker = load_system()
@@ -83,18 +105,25 @@ if "uploaded_chunks" not in st.session_state:
 if "uploaded_store" not in st.session_state:
     st.session_state.uploaded_store = None
 
+if "uploaded_pg_store" not in st.session_state:
+    st.session_state.uploaded_pg_store = None
+
 if "uploaded_filename" not in st.session_state:
     st.session_state.uploaded_filename = None
 
-if "pipeline" not in st.session_state:
-    st.session_state.pipeline = "RAG v1 - Simple"
+if "uploaded_document_id" not in st.session_state:
+    st.session_state.uploaded_document_id = None
 
-if "first_question" not in st.session_state:        # FIX 1: track only first question
+if "pipeline" not in st.session_state:
+    st.session_state.pipeline = "RAG v3 - LangChain"
+
+if "first_question" not in st.session_state:       
     st.session_state.first_question = None
 
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 
+print("SESSION:", st.session_state.session_id)
 
 # ── SIDEBAR 
 with st.sidebar:
@@ -189,11 +218,13 @@ if st.session_state.uploaded_filename is None:
 
         if uploaded_file is not None:
             with st.spinner(f"Indexing {uploaded_file.name}..."):
-                new_chunks, new_store = process_uploaded_file(
+                new_chunks, new_store,  new_pg_store, document_id = process_uploaded_file(
                     uploaded_file, embedder
                 )
                 st.session_state.uploaded_chunks = new_chunks
                 st.session_state.uploaded_store = new_store
+                st.session_state.uploaded_pg_store = new_pg_store
+                st.session_state.uploaded_document_id = document_id
                 st.session_state.uploaded_filename = uploaded_file.name
                 st.session_state.messages = []
                 st.session_state.first_question = None
@@ -203,9 +234,11 @@ if st.session_state.uploaded_filename is None:
 
 
 # ── ACTIVE DOCUMENT 
-active_chunks   = st.session_state.uploaded_chunks
-active_store    = st.session_state.uploaded_store
+active_chunks = st.session_state.uploaded_chunks
+active_store = st.session_state.uploaded_store
+active_pg_store = st.session_state.uploaded_pg_store
 active_filename = st.session_state.uploaded_filename
+active_document_id = st.session_state.uploaded_document_id
 
 
 # ── MAIN AREA 
@@ -446,9 +479,12 @@ if query:
                     query, embedder, active_store, active_chunks
                 )
             else:
-                state = run_rag_v3(
-                    query=query,embedder=embedder,store=active_store,chunks=active_chunks, session_id=st.session_state.session_id
-                )
+                import inspect
+                print("========================================")
+                print("V3 FUNCTION:", inspect.getfile(run_rag_v3))
+                print("V3 SIGNATURE:", inspect.signature(run_rag_v3))
+                print("========================================")
+                state = run_rag_v3(query=query, embedder=embedder, session_id=st.session_state.session_id)
                 answer = state.answer
                 faithfulness = state.faithfulness
                 relevance = state.relevance

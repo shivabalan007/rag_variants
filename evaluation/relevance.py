@@ -1,4 +1,4 @@
-from llm.openrouter_client import llm
+from llm.groq_client import llm
 
 
 def check_relevance(query, answer):
@@ -120,7 +120,6 @@ Do not explain.
 Do not justify.
 
 Do not output punctuation.
-
 """
 
     result = llm(
@@ -128,7 +127,21 @@ Do not output punctuation.
         temperature=0.0
     )
 
-    return result.strip().upper()
+    # LLM/provider failure.
+    # Evaluation could not be performed.
+    if result is None:
+        return "N/A"
+
+    result = result.strip().upper()
+
+    # Protect against unexpected model output.
+    if result not in {"YES", "NO"}:
+        return "N/A"
+
+    return result
+
+
 """
-Asks LLM whether the answer directly addresses the user's question. Returns YES or NO — catches off-topic or evasive answers.
+Asks LLM whether the answer directly addresses the user's question.
+Returns YES, NO, or N/A when the evaluation LLM is unavailable.
 """

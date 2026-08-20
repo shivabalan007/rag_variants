@@ -1,10 +1,13 @@
 from orchestration.agent_state import AgentState
 
-from retrieval.query_rewriter import rewrite_query
-from retrieval.hybrid_search import HybridRetriever
+from retrieval.query_rewriter import rewrite_query, rewrite_with_memory
+from retrieval.pg_hybrid_search import PGHybridRetriever
 from retrieval.reranker import CrossEncoderReranker
 
 from llm.generator import generate_answer
+
+from conversation.reference_signals import ReferenceSignalDetector 
+from retrieval.query_rewriter import (rewrite_standalone, rewrite_with_memory)
 
 from evaluation.overlap import context_overlap_score
 from evaluation.faithfulness import check_faithfulness
@@ -23,18 +26,22 @@ from monitoring.cost_tracker import CostTracker
 
 class RAGV3Pipeline:
 
-    def __init__(self, embedder, store, chunks, memory):
+    def __init__(self, embedder, store, chunks, memory, hybrid_retriever):
 
         self.embedder = embedder
         self.store = store
         self.chunks = chunks
         self.memory = memory
 
-        self.hybrid_retriever = HybridRetriever(chunks)
+        self.reference_detector = ReferenceSignalDetector()
+
+        self.hybrid_retriever = hybrid_retriever
+
         self.reranker = CrossEncoderReranker()        
         self.router = QueryRouter()
         self.intent_router = IntentRouter()
         self.web_searcher = WebSearcher()
+        
 
         self.metrics_logger = PipelineLogger()
         self.latency_tracker = LatencyTracker()
@@ -156,14 +163,30 @@ class RAGV3Pipeline:
     def rewrite(self, state: AgentState):
         self.latency_tracker.start("rewrite")
 
-        state.rewritten_query = rewrite_query(
-            query=state.original_query,
-            conversation_history=state.conversation_history
-        )
-        
-        self.latency_tracker.stop("rewrite")
+        reference = self.reference_detector.detect(state.original_query)
 
-        return state
+        state.needs_memory = reference.needs_memory 
+        state.reference_reason = reference.reason
+
+        if reference.needs_memory:
+            state.rewritten_query = rewrite_with_memory(
+                query=state.original_query,
+                conversation_history=state.conversation_history
+            )
+        else:
+            state.rewritten_query = rewrite_standalone(state.original_query)
+
+        print("\n========== REFERENCE DETECTION ==========")
+        print("Original Query :", state.original_query)
+        print("Needs Memory   :", state.needs_memory)
+        print("Reason         :", state.reference_reason)
+        print("Rewritten      :", state.rewritten_query)
+        print("=" * 50) 
+
+        self.latency_tracker.stop("rewrite")  
+
+        return state 
+
 
     # Stage 2 : Retrieve
 

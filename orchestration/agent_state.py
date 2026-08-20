@@ -7,6 +7,9 @@ class AgentState:
         self.original_query = query
         self.rewritten_query = None
 
+        self.needs_memory = False
+        self.reference_reason = "standalone"
+
         #Retrieval
         self.retrieval_result = None
 
