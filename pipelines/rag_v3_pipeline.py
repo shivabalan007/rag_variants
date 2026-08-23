@@ -1,5 +1,6 @@
 from orchestration.agent_state import AgentState
 
+from retrieval import reranker
 from retrieval.query_rewriter import rewrite_query, rewrite_with_memory
 from retrieval.pg_hybrid_search import PGHybridRetriever
 from retrieval.reranker import CrossEncoderReranker
@@ -26,7 +27,7 @@ from monitoring.cost_tracker import CostTracker
 
 class RAGV3Pipeline:
 
-    def __init__(self, embedder, store, chunks, memory, hybrid_retriever):
+    def __init__(self, embedder, store, chunks, memory, hybrid_retriever, reranker):
 
         self.embedder = embedder
         self.store = store
@@ -37,7 +38,7 @@ class RAGV3Pipeline:
 
         self.hybrid_retriever = hybrid_retriever
 
-        self.reranker = CrossEncoderReranker()        
+        self.reranker = reranker
         self.router = QueryRouter()
         self.intent_router = IntentRouter()
         self.web_searcher = WebSearcher()
@@ -82,6 +83,7 @@ class RAGV3Pipeline:
     Respond naturally.
 
     Do not use document retrieval.
+    Do not use web search.
 
     Answer:
     """
@@ -90,7 +92,15 @@ class RAGV3Pipeline:
 
         state.answer = llm(prompt, temperature=0.5)
 
+        if not state.answer:
+            state.answer = "I couldn't generate a response."
+
+        state.intent = "general"
+        state.route = "general"
         state.answer_source = "General"
+        state.route_reason = "Casual conversation; retrieval not required."
+        state.route_confidence = 1.0
+        state.confidence_level = "HIGH"
 
         return state
 
@@ -154,7 +164,15 @@ class RAGV3Pipeline:
 
         state.answer = llm(prompt,temperature=0.0)
 
+        if not state.answer:
+            state.answer = "I don't remember that from our conversation."
+
+        state.intent = "memory"
+        state.route = "memory"
         state.answer_source = "Memory"
+        state.route_reason = "Answer retrieved from conversation memory."
+        state.route_confidence = 1.0
+        state.confidence_level = "HIGH"
 
         return state
 
@@ -256,7 +274,7 @@ class RAGV3Pipeline:
         self.latency_tracker.start("generate")
 
     # LOW confidence -> Direct Web Search
-        if state.confidence_level == "LOW":
+        if (state.confidence_level == "LOW" and state.intent == "knowledge"):
         
             print("\n========== WEB FALLBACK ==========")
             print("Reason :", "Low retrieval confidence")
@@ -544,7 +562,10 @@ if __name__ == "__main__":
     pipeline = RAGV3Pipeline(
         embedder=embedder,
         store=index,
-        chunks=chunks
+        chunks=chunks,
+        memory=memory,
+        hybrid_retriever=hybrid_retriever,
+        reranker=reranker,
     )
 
     while True:

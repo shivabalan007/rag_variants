@@ -9,7 +9,7 @@ load_dotenv()
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-DEFAULT_MODEL = "google/gemma-4-26b-a4b-it:free"
+DEFAULT_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
 
 DEFAULT_MAX_TOKENS = 800
 
@@ -135,10 +135,10 @@ OpenAI-compatible client pointed at OpenRouter API with DeepSeek model. Single l
 """
 
 """
+google/gemma-4-26b-a4b-it:free
 openai/gpt-oss-120b:free
 nvidia/nemotron-3-ultra:free
 nvidia/nemotron-3-super:free
-google/gemma-4-26b-a4b:free
 openai/gpt-oss-20b:free
 nvidia/nemotron-3-nano-30b-a3b:free
 

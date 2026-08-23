@@ -29,7 +29,7 @@ class PGVectorStore:
         pass
 
 
-    def add(self,document_id: str, filename: str, chunks: Sequence, embeddings: np.ndarray,) -> int:
+    def add(self,document_id: str, filename: str, content_hash: str, chunks: Sequence, embeddings: np.ndarray,) -> int:
         """
         Store document chunks and their embeddings in PostgreSQL.
 
@@ -56,6 +56,10 @@ class PGVectorStore:
 
         if not filename:
             raise ValueError("filename cannot be empty.")
+
+        
+        if not content_hash:
+            raise ValueError("content_hash cannot be empty.")
 
         if chunks is None:
             raise ValueError("chunks cannot be None.")
@@ -125,6 +129,7 @@ class PGVectorStore:
                     DocumentChunk(
                         document_id=document_id,
                         filename=filename,
+                        content_hash=content_hash,
                         content=content,
                         chunk_index=index,
                         embedding=vector,
@@ -287,6 +292,7 @@ class PGVectorStore:
         finally:
             db.close()
 
+    
     def delete_document(
         self,
         document_id: str,
@@ -318,6 +324,40 @@ class PGVectorStore:
         except Exception:
             db.rollback()
             raise
+
+        finally:
+            db.close()
+
+    def document_hash_exists(self, content_hash: str) -> bool:
+        """
+        Check whether a document with the given content has already exists in PostgreSQL.
+        """
+
+        if not content_hash:
+            return False
+
+        db: Session = SessionLocal()
+
+        try:
+            result = (db.query(DocumentChunk.id).filter(DocumentChunk.content_hash == content_hash).first())
+
+            return result is not None
+
+        finally:
+            db.close()
+
+    def get_document_by_hash(self, content_hash: str):
+        if not content_hash:
+            return None
+
+        db: Session = SessionLocal()
+
+        try:
+            result = (
+                db.query(DocumentChunk.document_id).filter(DocumentChunk.content_hash == content_hash).first()
+            )
+
+            return result[0] if result else None
 
         finally:
             db.close()

@@ -12,7 +12,7 @@ from retrieval.pg_hybrid_search import PGHybridRetriever
 _pipeline = {}
 
 
-def run_rag_v3(query, embedder, session_id, user_id="default_user"):
+def run_rag_v3(query, embedder, session_id, reranker, user_id="default_user"):
     global _pipeline
 
     print("="*60)
@@ -46,7 +46,8 @@ def run_rag_v3(query, embedder, session_id, user_id="default_user"):
             store=pg_store,
             chunks=None,
             memory=memory,
-            hybrid_retriever=pg_hybrid_retriever
+            hybrid_retriever=pg_hybrid_retriever,
+            reranker=reranker,
         )
     else:
         print(">>> Reusing Existing Pipeline")

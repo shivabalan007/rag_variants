@@ -1,9 +1,12 @@
 import streamlit as st
+import os
+import tempfile
 import faiss
 import pickle
 import uuid
 
 from ingestion.base import Document
+from ingestion.run_ingestion import ingest
 from chunking.semantic_chunker import semantic_chunk
 from chunking.sliding_window_chunker import sliding_window_chunk
 from embeddings.base import EmbeddingConfig
@@ -18,11 +21,6 @@ from rag_v2 import run_rag_v2
 from rag_v3 import run_rag_v3
 
 from database.init_db import init_database
-init_database()
-
-legacy_reranker = LegacyReranker()
-
-
 
 st.set_page_config(
     page_title="Advanced RAG",
@@ -46,10 +44,41 @@ def load_system():
 
     return embedder, store, chunks, reranker
 
+@st.cache_resource
+def load_legacy_reranker():
+    return LegacyReranker()
+
+init_database()
+
+legacy_reranker = load_legacy_reranker()
 
 def process_uploaded_file(uploaded_file, embedder):
 
-    content = uploaded_file.read().decode("utf-8",errors="ignore")
+    import hashlib
+    file_bytes = uploaded_file.getvalue()
+
+    content_hash = hashlib.sha256(file_bytes).hexdigest()
+
+    pg_store = PGVectorStore()
+
+    existing_document_id = pg_store.get_document_by_hash(content_hash)
+
+    if existing_document_id:
+        return ([],None,pg_store,existing_document_id)
+    
+    with tempfile.NamedTemporaryFile(delete=False,suffix=os.path.splitext(uploaded_file.name)[1]) as tmp:
+
+        tmp.write(file_bytes)
+        temp_path = tmp.name
+
+    try:
+        documents = ingest(temp_path)
+
+    finally:
+        os.unlink(temp_path)
+
+    content = "\n".join(document.text for document in documents)
+    
     new_chunks = []
     semantic_chunks = semantic_chunk(content)
 
@@ -76,11 +105,11 @@ def process_uploaded_file(uploaded_file, embedder):
 
     # V3 → PostgreSQL + pgvector
     document_id = str(uuid.uuid4())
-    pg_store = PGVectorStore()
 
     pg_store.add(
         document_id=document_id,
         filename=uploaded_file.name,
+        content_hash=content_hash,
         chunks=new_chunks,
         embeddings=embeddings
     )
@@ -123,7 +152,7 @@ if "first_question" not in st.session_state:
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 
-print("SESSION:", st.session_state.session_id)
+# print("SESSION:", st.session_state.session_id)
 
 # ── SIDEBAR 
 with st.sidebar:
@@ -240,6 +269,10 @@ active_pg_store = st.session_state.uploaded_pg_store
 active_filename = st.session_state.uploaded_filename
 active_document_id = st.session_state.uploaded_document_id
 
+if active_document_id and active_pg_store:
+    active_chunk_count = active_pg_store.document_chunk_count(active_document_id)
+else:
+    active_chunk_count = len(active_chunks or [])
 
 # ── MAIN AREA 
 # FIX 2: bold title on chat page
@@ -253,7 +286,7 @@ st.markdown(
     f"<span style='font-size:11px;padding:3px 10px;border-radius:20px;"
     f"background:#EAF3DE;color:#27500A;'>{active_filename}</span>"
     f"<span style='font-size:11px;padding:3px 10px;border-radius:20px;"
-    f"background:#EEEDFE;color:#3C3489;'>{len(active_chunks)} chunks</span>"
+    f"background:#EEEDFE;color:#3C3489;'>{active_chunk_count} chunks</span>"
     f"</div></div>",
     unsafe_allow_html=True
 )
@@ -479,12 +512,7 @@ if query:
                     query, embedder, active_store, active_chunks
                 )
             else:
-                import inspect
-                print("========================================")
-                print("V3 FUNCTION:", inspect.getfile(run_rag_v3))
-                print("V3 SIGNATURE:", inspect.signature(run_rag_v3))
-                print("========================================")
-                state = run_rag_v3(query=query, embedder=embedder, session_id=st.session_state.session_id)
+                state = run_rag_v3(query=query, embedder=embedder, session_id=st.session_state.session_id, reranker=reranker)
                 answer = state.answer
                 faithfulness = state.faithfulness
                 relevance = state.relevance

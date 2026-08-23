@@ -90,10 +90,34 @@ def _build_history(conversation_history=None) -> str:
 
     return "\n".join(history_lines)
 
+def _needs_standalone_rewrite(query: str) -> bool:
+    """
+    Determine whether a standalone query is worth sending
+    to the LLM for rewriting.
+    """
 
-# ============================================================
+    query_lower = query.lower().strip()
+
+    # Queries containing common abbreviations may benefit
+    # from LLM-based expansion.
+    technical_terms = {
+        "ai",
+        "rag",
+        "oop",
+        "nlp",
+        "llm",
+        "api",
+        "bm25",
+        "tf-idf",
+    }
+
+    words = set(query_lower.split())
+
+    if words.intersection(technical_terms):
+        return True
+
+    return False
 # Standalone Query Rewriting
-# ============================================================
 
 def rewrite_standalone(query: str) -> str:
     """
@@ -110,6 +134,9 @@ def rewrite_standalone(query: str) -> str:
 
     if not query:
         return ""
+
+    if not _needs_standalone_rewrite(query):
+        return query
 
     prompt = f"""
 You are an expert Query Rewriting Assistant for a

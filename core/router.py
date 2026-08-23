@@ -3,6 +3,8 @@ import math
 from enum import Enum
 from dataclasses import dataclass
 
+from core import retrieval_result
+
 
 class Route(Enum):
     DOCUMENT = "document"
@@ -36,32 +38,47 @@ class QueryRouter:
         self.vector_weight = vector_weight
         self.rerank_weight = rerank_weight
 
-    def calculate_confidence(self, retrieval_result,) -> float:
-        """
-        Calculates overall retrieval confidence using
-        vector similarity and CrossEncoder rerank score.
-        """
+    def calculate_confidence(self, retrieval_result) -> float:
 
         if not retrieval_result.has_documents():
             return 0.0
 
-        # Raw Score
-        vector_score = retrieval_result.top_vector_score()
-        bm25_score = retrieval_result.top_bm25_score()
-        rerank_score = retrieval_result.top_rerank_score()
+        chunk_confidences = []
 
-        # Normalize score
-        #  FAISS
-        vector_confidence = min(vector_score / 2.0, 1.0)
+        for item in retrieval_result.retrieved_chunks:
+
+        # Dense retrieval
+
+            vector_confidence = max(0.0, min(item.vector_score, 1.0))
+
         # BM25
-        bm25_confidence = min(bm25_score / 5.0, 1.0)
-        # CrossEncoder
-        rerank_confidence = 1 / (1 + math.exp(-rerank_score))
 
-        confidence = (0.4 * vector_confidence + 0.3 * bm25_confidence + 0.3 * rerank_confidence)
+            if item.bm25_score <= 0:
+                bm25_confidence = 0.0
+            else:
+                bm25_confidence = (item.bm25_score /(item.bm25_score + 3.0))
+
+        # CrossEncoder
+
+            rerank_confidence = (1.0 / (1.0 + math.exp(-item.rerank_score)))
+
+        # Combined chunk confidence
+
+            chunk_confidence = (
+                0.40 * vector_confidence
+                + 0.25 * bm25_confidence
+                + 0.35 * rerank_confidence
+            )
+
+            chunk_confidences.append(chunk_confidence)
+
+        if not chunk_confidences:
+            return 0.0
+
+        confidence = max(chunk_confidences)
 
         return round(max(0.0, min(confidence, 1.0)),3)
-
+    
     def route(self, retrieval_result) -> RoutingResult:
         """
         Decide whether to answer from the uploaded

@@ -43,6 +43,13 @@ class DocumentChunk(Base):
         index=True
     )
 
+    content_hash = Column(
+        String(64),
+        nullable=False,
+        index=True,
+        unique=True
+    )
+
     content = Column(
         Text,
         nullable=False
@@ -70,5 +77,7 @@ class DocumentChunk(Base):
     )
     
 """
-V3 PostgreSQL table that stores document chunks, metadata, and their 384-dimensional embeddings for pgvector similarity search.
+V3 PostgreSQL table that stores document chunks, metadata,
+384-dimensional embeddings, and a SHA-256 document hash
+used to prevent duplicate document ingestion.
 """
